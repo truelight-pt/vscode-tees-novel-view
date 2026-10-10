@@ -2,7 +2,7 @@
   "name": "tees-novel-view",
   "displayName": "Tee's Novel View",
   "description": "テキストファイル(.txt)を小説として閲覧するための「小説ビュー」。「小説家になろう」形式のルビ表示と、会話文・心の声などの色分けに対応。",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "publisher": "Tees-software",
   "icon": "media/icon.png",
   "license": "MIT",
@@ -183,6 +183,12 @@
         "title": "前話・次話: 物語ファイル一覧の順（クリックで同じフォルダー内に切り替え）",
         "category": "Novel View",
         "icon": "$(list-tree)"
+      },
+      {
+        "command": "teesNovelView.openChanges",
+        "title": "変更を開く",
+        "category": "Novel View",
+        "icon": "$(compare-changes)"
       }
     ],
     "menus": {
@@ -191,6 +197,11 @@
           "command": "teesNovelView.showPreview",
           "when": "resourceExtname =~ /^\\.txt$/i && activeEditor == 'workbench.editors.files.textFileEditor'",
           "group": "navigation"
+        },
+        {
+          "command": "teesNovelView.openChanges",
+          "when": "activeWebviewPanelId == 'teesNovelView.preview' && teesNovelView.hasGitChanges",
+          "group": "navigation@0"
         },
         {
           "command": "teesNovelView.previousEpisode",
@@ -345,6 +356,10 @@
         {
           "command": "teesNovelView.disableFollowStoryList",
           "when": "config.teesNovelView.episode.followStoryList"
+        },
+        {
+          "command": "teesNovelView.openChanges",
+          "when": "activeWebviewPanelId == 'teesNovelView.preview' && teesNovelView.hasGitChanges"
         }
       ],
       "view/title": [
