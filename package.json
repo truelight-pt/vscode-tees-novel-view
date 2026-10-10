@@ -1,0 +1,786 @@
+{
+  "name": "tees-novel-view",
+  "displayName": "Tee's Novel View",
+  "description": "テキストファイル(.txt)を小説として閲覧するための「小説ビュー」。「小説家になろう」形式のルビ表示と、会話文・心の声などの色分けに対応。",
+  "version": "1.0.0",
+  "publisher": "Tees-software",
+  "icon": "media/icon.png",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/truelight-pt/vscode-tees-novel-view.git"
+  },
+  "homepage": "https://github.com/truelight-pt/vscode-tees-novel-view#readme",
+  "bugs": {
+    "url": "https://github.com/truelight-pt/vscode-tees-novel-view/issues"
+  },
+  "engines": {
+    "vscode": "^1.75.0"
+  },
+  "categories": [
+    "Other"
+  ],
+  "keywords": [
+    "novel",
+    "ruby",
+    "小説",
+    "ルビ",
+    "なろう"
+  ],
+  "main": "./out/extension.js",
+  "activationEvents": [
+    "onWebviewPanel:teesNovelView.preview",
+    "onLanguage:plaintext",
+    "onView:teesNovelView.stories",
+    "onView:teesNovelView.bookmarks"
+  ],
+  "contributes": {
+    "commands": [
+      {
+        "command": "teesNovelView.showPreview",
+        "title": "小説ビューに切り替え",
+        "category": "Novel View",
+        "icon": "$(book)"
+      },
+      {
+        "command": "teesNovelView.showPreviewToSide",
+        "title": "小説ビューを横に開く",
+        "category": "Novel View",
+        "icon": "$(book)"
+      },
+      {
+        "command": "teesNovelView.showSource",
+        "title": "ソースに切り替え",
+        "category": "Novel View",
+        "icon": "$(go-to-file)"
+      },
+      {
+        "command": "teesNovelView.previousEpisode",
+        "title": "前話を開く",
+        "category": "Novel View",
+        "icon": "$(arrow-left)",
+        "enablement": "teesNovelView.hasPreviousEpisode"
+      },
+      {
+        "command": "teesNovelView.nextEpisode",
+        "title": "次話を開く",
+        "category": "Novel View",
+        "icon": "$(arrow-right)",
+        "enablement": "teesNovelView.hasNextEpisode"
+      },
+      {
+        "command": "teesNovelView.toggleHighlight",
+        "title": "カラーリングの ON/OFF を切り替え",
+        "category": "Novel View",
+        "icon": "$(symbol-color)"
+      },
+      {
+        "command": "teesNovelView.toggleLineNumbers",
+        "title": "行番号の表示を切り替え",
+        "category": "Novel View",
+        "icon": "$(list-ordered)"
+      },
+      {
+        "command": "teesNovelView.toggleRuby",
+        "title": "ルビ表示の ON/OFF を切り替え",
+        "category": "Novel View"
+      },
+      {
+        "command": "teesNovelView.openStory",
+        "title": "小説ビューで開く",
+        "category": "Novel View"
+      },
+      {
+        "command": "teesNovelView.refreshStories",
+        "title": "物語ファイル一覧を再読み込み",
+        "category": "Novel View",
+        "icon": "$(refresh)"
+      },
+      {
+        "command": "teesNovelView.openStoriesSettings",
+        "title": "物語ファイル一覧の設定を開く",
+        "category": "Novel View",
+        "icon": "$(gear)"
+      },
+      {
+        "command": "teesNovelView.toggleBookmark",
+        "title": "ブックマークの追加/削除",
+        "category": "Novel View",
+        "icon": "$(bookmark)"
+      },
+      {
+        "command": "teesNovelView.openBookmark",
+        "title": "ブックマークへ移動",
+        "category": "Novel View"
+      },
+      {
+        "command": "teesNovelView.renameBookmark",
+        "title": "名前を変更",
+        "category": "Novel View",
+        "icon": "$(edit)"
+      },
+      {
+        "command": "teesNovelView.removeBookmark",
+        "title": "削除",
+        "category": "Novel View",
+        "icon": "$(trash)"
+      },
+      {
+        "command": "teesNovelView.clearBookmarks",
+        "title": "すべてのブックマークを削除",
+        "category": "Novel View",
+        "icon": "$(clear-all)",
+        "enablement": "teesNovelView.hasBookmarks"
+      },
+      {
+        "command": "teesNovelView.nextBookmark",
+        "title": "次のブックマークへ移動",
+        "category": "Novel View"
+      },
+      {
+        "command": "teesNovelView.previousBookmark",
+        "title": "前のブックマークへ移動",
+        "category": "Novel View"
+      },
+      {
+        "command": "teesNovelView.enableCrossFileBookmarks",
+        "title": "F2 で移動: このファイル内のみ（クリックでファイルをまたぐ）",
+        "category": "Novel View",
+        "icon": "$(file)"
+      },
+      {
+        "command": "teesNovelView.disableCrossFileBookmarks",
+        "title": "F2 で移動: ファイルをまたぐ（クリックでこのファイル内のみ）",
+        "category": "Novel View",
+        "icon": "$(files)"
+      },
+      {
+        "command": "teesNovelView.copyBody",
+        "title": "本文をコピー",
+        "category": "Novel View",
+        "icon": "$(copy)"
+      },
+      {
+        "command": "teesNovelView.openStoriesAsText",
+        "title": "クリックで開く: 小説ビュー（クリックでテキストファイルに切り替え）",
+        "category": "Novel View",
+        "icon": "$(book)"
+      },
+      {
+        "command": "teesNovelView.openStoriesInNovelView",
+        "title": "クリックで開く: テキストファイル（クリックで小説ビューに切り替え）",
+        "category": "Novel View",
+        "icon": "$(file-text)"
+      },
+      {
+        "command": "teesNovelView.enableFollowStoryList",
+        "title": "前話・次話: 同じフォルダー内（クリックで物語ファイル一覧の順に切り替え）",
+        "category": "Novel View",
+        "icon": "$(folder)"
+      },
+      {
+        "command": "teesNovelView.disableFollowStoryList",
+        "title": "前話・次話: 物語ファイル一覧の順（クリックで同じフォルダー内に切り替え）",
+        "category": "Novel View",
+        "icon": "$(list-tree)"
+      }
+    ],
+    "menus": {
+      "editor/title": [
+        {
+          "command": "teesNovelView.showPreview",
+          "when": "resourceExtname =~ /^\\.txt$/i && activeEditor == 'workbench.editors.files.textFileEditor'",
+          "group": "navigation"
+        },
+        {
+          "command": "teesNovelView.previousEpisode",
+          "when": "activeWebviewPanelId == 'teesNovelView.preview'",
+          "group": "navigation@1"
+        },
+        {
+          "command": "teesNovelView.nextEpisode",
+          "when": "activeWebviewPanelId == 'teesNovelView.preview'",
+          "group": "navigation@2"
+        },
+        {
+          "command": "teesNovelView.enableFollowStoryList",
+          "when": "activeWebviewPanelId == 'teesNovelView.preview' && !config.teesNovelView.episode.followStoryList",
+          "group": "navigation@3"
+        },
+        {
+          "command": "teesNovelView.disableFollowStoryList",
+          "when": "activeWebviewPanelId == 'teesNovelView.preview' && config.teesNovelView.episode.followStoryList",
+          "group": "navigation@3"
+        },
+        {
+          "command": "teesNovelView.toggleBookmark",
+          "when": "activeWebviewPanelId == 'teesNovelView.preview'",
+          "group": "navigation@4"
+        },
+        {
+          "command": "teesNovelView.toggleLineNumbers",
+          "when": "activeWebviewPanelId == 'teesNovelView.preview'",
+          "group": "navigation@5"
+        },
+        {
+          "command": "teesNovelView.toggleHighlight",
+          "when": "activeWebviewPanelId == 'teesNovelView.preview'",
+          "group": "navigation@6"
+        },
+        {
+          "command": "teesNovelView.showSource",
+          "when": "activeWebviewPanelId == 'teesNovelView.preview'",
+          "group": "navigation@7"
+        }
+      ],
+      "editor/title/context": [
+        {
+          "command": "teesNovelView.showPreview",
+          "when": "resourceExtname =~ /^\\.txt$/i",
+          "group": "1_open"
+        },
+        {
+          "command": "teesNovelView.showPreviewToSide",
+          "when": "resourceExtname =~ /^\\.txt$/i",
+          "group": "1_open"
+        }
+      ],
+      "webview/context": [
+        {
+          "command": "teesNovelView.toggleBookmark",
+          "when": "webviewId == 'teesNovelView.preview'",
+          "group": "navigation"
+        },
+        {
+          "command": "teesNovelView.showSource",
+          "when": "webviewId == 'teesNovelView.preview'",
+          "group": "navigation"
+        },
+        {
+          "command": "teesNovelView.copyBody",
+          "when": "webviewId == 'teesNovelView.preview'",
+          "group": "9_cutcopypaste"
+        }
+      ],
+      "explorer/context": [
+        {
+          "command": "teesNovelView.showPreview",
+          "when": "resourceExtname =~ /^\\.txt$/i",
+          "group": "navigation"
+        }
+      ],
+      "commandPalette": [
+        {
+          "command": "teesNovelView.showPreview",
+          "when": "resourceExtname =~ /^\\.txt$/i"
+        },
+        {
+          "command": "teesNovelView.showPreviewToSide",
+          "when": "resourceExtname =~ /^\\.txt$/i"
+        },
+        {
+          "command": "teesNovelView.showSource",
+          "when": "activeWebviewPanelId == 'teesNovelView.preview'"
+        },
+        {
+          "command": "teesNovelView.previousEpisode",
+          "when": "activeWebviewPanelId == 'teesNovelView.preview'"
+        },
+        {
+          "command": "teesNovelView.nextEpisode",
+          "when": "activeWebviewPanelId == 'teesNovelView.preview'"
+        },
+        {
+          "command": "teesNovelView.openStory",
+          "when": "false"
+        },
+        {
+          "command": "teesNovelView.toggleBookmark",
+          "when": "activeWebviewPanelId == 'teesNovelView.preview'"
+        },
+        {
+          "command": "teesNovelView.openBookmark",
+          "when": "false"
+        },
+        {
+          "command": "teesNovelView.renameBookmark",
+          "when": "false"
+        },
+        {
+          "command": "teesNovelView.removeBookmark",
+          "when": "false"
+        },
+        {
+          "command": "teesNovelView.nextBookmark",
+          "when": "activeWebviewPanelId == 'teesNovelView.preview'"
+        },
+        {
+          "command": "teesNovelView.previousBookmark",
+          "when": "activeWebviewPanelId == 'teesNovelView.preview'"
+        },
+        {
+          "command": "teesNovelView.enableCrossFileBookmarks",
+          "when": "!config.teesNovelView.bookmarks.crossFile"
+        },
+        {
+          "command": "teesNovelView.disableCrossFileBookmarks",
+          "when": "config.teesNovelView.bookmarks.crossFile"
+        },
+        {
+          "command": "teesNovelView.copyBody",
+          "when": "activeWebviewPanelId == 'teesNovelView.preview'"
+        },
+        {
+          "command": "teesNovelView.openStoriesAsText",
+          "when": "config.teesNovelView.stories.openInNovelView"
+        },
+        {
+          "command": "teesNovelView.openStoriesInNovelView",
+          "when": "!config.teesNovelView.stories.openInNovelView"
+        },
+        {
+          "command": "teesNovelView.enableFollowStoryList",
+          "when": "!config.teesNovelView.episode.followStoryList"
+        },
+        {
+          "command": "teesNovelView.disableFollowStoryList",
+          "when": "config.teesNovelView.episode.followStoryList"
+        }
+      ],
+      "view/title": [
+        {
+          "command": "teesNovelView.refreshStories",
+          "when": "view == teesNovelView.stories",
+          "group": "navigation@1"
+        },
+        {
+          "command": "teesNovelView.openStoriesSettings",
+          "when": "view == teesNovelView.stories",
+          "group": "navigation@2"
+        },
+        {
+          "command": "teesNovelView.clearBookmarks",
+          "when": "view == teesNovelView.bookmarks",
+          "group": "navigation@2"
+        },
+        {
+          "command": "teesNovelView.enableCrossFileBookmarks",
+          "when": "view == teesNovelView.bookmarks && !config.teesNovelView.bookmarks.crossFile",
+          "group": "navigation@1"
+        },
+        {
+          "command": "teesNovelView.disableCrossFileBookmarks",
+          "when": "view == teesNovelView.bookmarks && config.teesNovelView.bookmarks.crossFile",
+          "group": "navigation@1"
+        },
+        {
+          "command": "teesNovelView.openStoriesAsText",
+          "when": "view == teesNovelView.stories && config.teesNovelView.stories.openInNovelView",
+          "group": "navigation@0"
+        },
+        {
+          "command": "teesNovelView.openStoriesInNovelView",
+          "when": "view == teesNovelView.stories && !config.teesNovelView.stories.openInNovelView",
+          "group": "navigation@0"
+        }
+      ],
+      "view/item/context": [
+        {
+          "command": "teesNovelView.renameBookmark",
+          "when": "view == teesNovelView.bookmarks && viewItem == bookmark",
+          "group": "inline@1"
+        },
+        {
+          "command": "teesNovelView.removeBookmark",
+          "when": "view == teesNovelView.bookmarks && viewItem == bookmark",
+          "group": "inline@2"
+        },
+        {
+          "command": "teesNovelView.renameBookmark",
+          "when": "view == teesNovelView.bookmarks && viewItem == bookmark",
+          "group": "1_edit@1"
+        },
+        {
+          "command": "teesNovelView.removeBookmark",
+          "when": "view == teesNovelView.bookmarks && viewItem == bookmark",
+          "group": "1_edit@2"
+        }
+      ]
+    },
+    "keybindings": [
+      {
+        "command": "teesNovelView.showPreview",
+        "key": "ctrl+shift+v",
+        "mac": "cmd+shift+v",
+        "when": "editorTextFocus && resourceExtname =~ /^\\.txt$/i"
+      },
+      {
+        "command": "teesNovelView.showSource",
+        "key": "ctrl+shift+v",
+        "mac": "cmd+shift+v",
+        "when": "activeWebviewPanelId == 'teesNovelView.preview'"
+      },
+      {
+        "command": "teesNovelView.showPreviewToSide",
+        "key": "ctrl+k v",
+        "mac": "cmd+k v",
+        "when": "editorTextFocus && resourceExtname =~ /^\\.txt$/i"
+      },
+      {
+        "command": "teesNovelView.toggleBookmark",
+        "key": "ctrl+f2",
+        "mac": "cmd+f2",
+        "when": "activeWebviewPanelId == 'teesNovelView.preview'"
+      },
+      {
+        "command": "teesNovelView.nextBookmark",
+        "key": "f2",
+        "when": "activeWebviewPanelId == 'teesNovelView.preview'"
+      },
+      {
+        "command": "teesNovelView.previousBookmark",
+        "key": "shift+f2",
+        "when": "activeWebviewPanelId == 'teesNovelView.preview'"
+      }
+    ],
+    "configuration": {
+      "title": "Tee's Novel View",
+      "properties": {
+        "teesNovelView.charsPerLine": {
+          "type": "integer",
+          "default": 40,
+          "minimum": 0,
+          "order": 0,
+          "markdownDescription": "1行あたりの表示文字数（全角換算）。`0` の場合は小説ビューの幅いっぱいで折り返します。"
+        },
+        "teesNovelView.fontFamily": {
+          "type": "string",
+          "default": "",
+          "order": 1,
+          "markdownDescription": "小説ビューのフォント。空の場合はエディターのフォント（`editor.fontFamily`）を使用します。例: `\"Yu Mincho\", serif`"
+        },
+        "teesNovelView.fontSize": {
+          "type": "number",
+          "default": 16,
+          "minimum": 0,
+          "order": 2,
+          "markdownDescription": "小説ビューの文字サイズ(px)。`0` の場合はエディターの文字サイズを使用します。"
+        },
+        "teesNovelView.lineHeight": {
+          "type": "number",
+          "default": 1.9,
+          "minimum": 1,
+          "order": 3,
+          "markdownDescription": "行の高さ（文字サイズに対する倍率）。ルビが重ならないよう 1.7 以上を推奨します。"
+        },
+        "teesNovelView.lineNumbers": {
+          "type": "boolean",
+          "default": false,
+          "order": 4,
+          "markdownDescription": "小説ビューの左側に、元のテキストの行番号を表示します。"
+        },
+        "teesNovelView.ruby.enabled": {
+          "type": "boolean",
+          "default": true,
+          "order": 10,
+          "markdownDescription": "「小説家になろう」形式のルビ表記（`|漢字《かんじ》` など）をルビとして表示します。"
+        },
+        "teesNovelView.ruby.parentheses": {
+          "type": "boolean",
+          "default": false,
+          "order": 10,
+          "markdownDescription": "丸括弧 `()` `（）` もルビとして扱います（「小説家になろう」と同じ。括弧内がひらがな・カタカナのみの場合）。OFF の場合、ルビになるのは `《》` のみで、丸括弧は通常の括弧書きとして表示されます。"
+        },
+        "teesNovelView.scrollSync": {
+          "type": "boolean",
+          "default": true,
+          "order": 11,
+          "markdownDescription": "エディターのスクロールに小説ビューを追従させます。"
+        },
+        "teesNovelView.highlight.enabled": {
+          "type": "boolean",
+          "default": true,
+          "order": 20,
+          "markdownDescription": "カラーリング全体の ON/OFF。OFF にすると個別の設定に関係なく色分けを行いません。"
+        },
+        "teesNovelView.highlight.dialogue.enabled": {
+          "type": "boolean",
+          "default": true,
+          "order": 21,
+          "markdownDescription": "会話文（「」内）のカラーリングを行います。"
+        },
+        "teesNovelView.highlight.dialogue.color": {
+          "type": "string",
+          "default": "#3FB950",
+          "order": 22,
+          "markdownDescription": "会話文（「」内）の文字色。CSS の色指定（`#RRGGBB`、`rgb()`、色名など）が使えます。"
+        },
+        "teesNovelView.highlight.dialogue.brackets": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "pattern": "^.{2}$",
+            "patternErrorMessage": "開き括弧と閉じ括弧の2文字で指定してください（例: 「」）"
+          },
+          "default": [
+            "「」"
+          ],
+          "order": 23,
+          "markdownDescription": "会話文として扱う括弧。開き括弧と閉じ括弧の2文字で指定します。"
+        },
+        "teesNovelView.highlight.thought.enabled": {
+          "type": "boolean",
+          "default": true,
+          "order": 24,
+          "markdownDescription": "内心の吐露（（）内）のカラーリングを行います。"
+        },
+        "teesNovelView.highlight.thought.color": {
+          "type": "string",
+          "default": "#4FC1FF",
+          "order": 25,
+          "markdownDescription": "内心の吐露（（）内）の文字色。"
+        },
+        "teesNovelView.highlight.thought.brackets": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "pattern": "^.{2}$",
+            "patternErrorMessage": "開き括弧と閉じ括弧の2文字で指定してください（例: （））"
+          },
+          "default": [
+            "（）",
+            "()"
+          ],
+          "order": 26,
+          "markdownDescription": "内心の吐露として扱う括弧。開き括弧と閉じ括弧の2文字で指定します。"
+        },
+        "teesNovelView.highlight.quote.enabled": {
+          "type": "boolean",
+          "default": true,
+          "order": 27,
+          "markdownDescription": "『』内のカラーリングを行います。"
+        },
+        "teesNovelView.highlight.quote.color": {
+          "type": "string",
+          "default": "#E8C300",
+          "order": 28,
+          "markdownDescription": "『』内の文字色。"
+        },
+        "teesNovelView.highlight.quote.brackets": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "pattern": "^.{2}$",
+            "patternErrorMessage": "開き括弧と閉じ括弧の2文字で指定してください（例: 『』）"
+          },
+          "default": [
+            "『』"
+          ],
+          "order": 29,
+          "markdownDescription": "『』グループとして扱う括弧。開き括弧と閉じ括弧の2文字で指定します。"
+        },
+        "teesNovelView.highlight.number.enabled": {
+          "type": "boolean",
+          "default": true,
+          "order": 30,
+          "markdownDescription": "数字（半角・全角・漢数字）のカラーリングを行います。"
+        },
+        "teesNovelView.highlight.number.includeKanji": {
+          "type": "boolean",
+          "default": true,
+          "order": 32,
+          "markdownDescription": "漢数字（〇零一二三四五六七八九十百千万億兆）も数字としてカラーリングします。前後の文字から判定し、「統一」「一緒」「九州」のような熟語の一部は除外します。"
+        },
+        "teesNovelView.highlight.number.kanjiCounters": {
+          "type": "string",
+          "default": "人歳才年月日時分秒週代期世個本枚回度段階円名冊匹頭羽件台番倍割里尺寸丁巻話章部杯歩軒隻着点位列組行周泊戦級等条項粒滴袋箇",
+          "order": 33,
+          "markdownDescription": "漢数字の**直後**にあっても数字とみなす漢字（助数詞）。ここにない漢字が直後に続く場合は熟語とみなして色を付けません（例: 三人 ○ / 一緒 ✕）。"
+        },
+        "teesNovelView.highlight.number.kanjiPrefixes": {
+          "type": "string",
+          "default": "第約計毎各全総数",
+          "order": 34,
+          "markdownDescription": "漢数字の**直前**にあっても数字とみなす漢字（接頭語）。ここにない漢字が直前にある場合は熟語とみなして色を付けません（例: 第三 ○ / 統一 ✕）。"
+        },
+        "teesNovelView.highlight.number.color": {
+          "type": "string",
+          "default": "#FF9E3D",
+          "order": 31,
+          "markdownDescription": "数字の文字色。"
+        },
+        "teesNovelView.highlight.customRules": {
+          "type": "array",
+          "default": [],
+          "order": 40,
+          "markdownDescription": "正規表現によるカラーリング。後に書いたルールほど優先されます（括弧・数字の色より優先）。\n\n例:\n```json\n[\n  { \"pattern\": \"【[^】]*】\", \"color\": \"#C586C0\", \"enabled\": true },\n  { \"pattern\": \"alice\", \"flags\": \"i\", \"color\": \"red\", \"enabled\": true }\n]\n```",
+          "items": {
+            "type": "object",
+            "required": [
+              "pattern",
+              "color"
+            ],
+            "additionalProperties": false,
+            "properties": {
+              "pattern": {
+                "type": "string",
+                "description": "JavaScript の正規表現パターン（/ で囲まない）"
+              },
+              "flags": {
+                "type": "string",
+                "default": "",
+                "pattern": "^[imsu]*$",
+                "description": "正規表現フラグ（i, m, s, u）。g は自動で付与されます。"
+              },
+              "color": {
+                "type": "string",
+                "description": "文字色"
+              },
+              "enabled": {
+                "type": "boolean",
+                "default": true,
+                "description": "このルールの ON/OFF"
+              },
+              "name": {
+                "type": "string",
+                "description": "ルールの名前（任意・メモ用）"
+              }
+            }
+          }
+        },
+        "teesNovelView.episode.numberPattern": {
+          "type": "string",
+          "default": "[0-9０-９]+(?=[^0-9０-９]*$)",
+          "order": 50,
+          "markdownDescription": "前話・次話を探すときに、ファイル名（拡張子を除く）から番号を抜き出す正規表現。キャプチャグループがあれば1番目のグループを、無ければマッチ全体を番号とみなします。既定はファイル名の最後の数字（半角・全角）です。\n\n同じフォルダーの .txt のうち、**番号より前の部分が同じ**ファイルから、番号が前後するもの（番号が飛んでいる場合は最も近いもの）を開きます。\n\n例: `第([0-9０-９]+)話` … 「第12話_決戦.txt」の 12 を番号とみなす"
+        },
+        "teesNovelView.stories.roots": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "default": [],
+          "order": 60,
+          "markdownDescription": "物語ファイル一覧で探すフォルダー。空の場合はワークスペースのフォルダーを探します。絶対パス、またはワークスペースからの相対パスで指定します（ワークスペース外のフォルダーも指定できます）。\n\n例: `[\"novels\", \"D:/小説/原稿\"]`"
+        },
+        "teesNovelView.stories.autoDetect": {
+          "type": "boolean",
+          "default": true,
+          "order": 61,
+          "markdownDescription": "内容から物語ファイルを自動で判定します（ルビ《》がある、会話文「」『』や心の声（…）が 2 つ以上ある、全角スペースで字下げした行が 3 行以上ある、など）。OFF にすると、探すフォルダー内の `.txt` をすべて表示します。"
+        },
+        "teesNovelView.stories.detectByFolder": {
+          "type": "boolean",
+          "default": true,
+          "order": 61,
+          "markdownDescription": "物語ファイルは他のファイルと分けて 1 か所にまとめられている前提で、物語ファイルが見つかったフォルダーを検知先とし、その中の .txt をすべて物語ファイルとして扱います。\n\n- 親フォルダーの中身（サブフォルダーを含む）が .txt だけなら、親フォルダーも検知先に含めます（章ごとのフォルダー分けに対応）\n- 検知先の下のサブフォルダーは、中身が .txt だけのものを対象にします\n\n`#teesNovelView.stories.autoDetect#` が ON のときに有効です。"
+        },
+        "teesNovelView.stories.exclude": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "default": [
+            "**/node_modules/**",
+            "**/.git/**",
+            "**/.vscode/**",
+            "**/out/**",
+            "**/dist/**"
+          ],
+          "order": 62,
+          "markdownDescription": "物語ファイル一覧から除外するパターン（探すフォルダーからの相対パス）。`**` は任意の階層、`*` は任意の文字列に一致します。\n\n例: `**/下書き/**`、`**/memo*.txt`"
+        },
+        "teesNovelView.bookmarks.crossFile": {
+          "type": "boolean",
+          "default": false,
+          "order": 70,
+          "markdownDescription": "`F2` / `Shift+F2` で、ファイルをまたいでブックマークを移動します（ブックマーク一覧の並び順）。OFF の場合は表示中のファイルの中だけで移動します。ブックマーク一覧の右上のボタンでも切り替えられます。"
+        },
+        "teesNovelView.copyBody.skipLines": {
+          "type": "integer",
+          "default": 2,
+          "minimum": 0,
+          "order": 80,
+          "markdownDescription": "小説ビューの右クリック「本文をコピー」で、コピーから除く先頭の行数（タイトルと空行など）。"
+        },
+        "teesNovelView.stories.openInNovelView": {
+          "type": "boolean",
+          "default": true,
+          "order": 59,
+          "markdownDescription": "物語ファイル一覧でファイルをクリックしたとき、小説ビューで開きます。OFF の場合は元のテキストファイルをエディターで開きます。一覧の右上のボタンでも切り替えられます。"
+        },
+        "teesNovelView.minimap.enabled": {
+          "type": "boolean",
+          "default": true,
+          "order": 5,
+          "markdownDescription": "小説ビューの右端にミニマップ（文章全体の縮小表示）を表示します。クリックやドラッグでその位置へ移動できます。"
+        },
+        "teesNovelView.minimap.width": {
+          "type": "integer",
+          "default": 80,
+          "minimum": 40,
+          "maximum": 300,
+          "order": 6,
+          "markdownDescription": "ミニマップの幅（px）。"
+        },
+        "teesNovelView.episode.followStoryList": {
+          "type": "boolean",
+          "default": false,
+          "order": 51,
+          "markdownDescription": "小説ビューの前話・次話で、物語ファイル一覧の並び順の前後へ移動します（章のフォルダーや、番号の付け方が違うファイルもまたいで移動できます）。OFF の場合は同じフォルダーからファイル名の番号で探します。小説ビュー右上のボタンでも切り替えられます。"
+        }
+      }
+    },
+    "viewsContainers": {
+      "activitybar": [
+        {
+          "id": "teesNovelView",
+          "title": "小説",
+          "icon": "media/book.svg"
+        }
+      ]
+    },
+    "views": {
+      "teesNovelView": [
+        {
+          "id": "teesNovelView.stories",
+          "name": "物語ファイル",
+          "icon": "media/book.svg",
+          "contextualTitle": "小説"
+        },
+        {
+          "id": "teesNovelView.bookmarks",
+          "name": "ブックマーク",
+          "icon": "$(bookmark)",
+          "contextualTitle": "小説"
+        }
+      ]
+    },
+    "viewsWelcome": [
+      {
+        "view": "teesNovelView.stories",
+        "contents": "物語ファイルが見つかりませんでした。\n\nワークスペース内の .txt のうち、ルビ《》・会話文「」・全角スペースの字下げなどを含むファイルを物語ファイルとして表示します。\n\n別の場所を参照する場合や、検知されないファイルを表示する場合は設定を変更してください。\n[設定を開く](command:teesNovelView.openStoriesSettings)\n[再読み込み](command:teesNovelView.refreshStories)"
+      },
+      {
+        "view": "teesNovelView.bookmarks",
+        "contents": "ブックマークはまだありません。\n\n小説ビューで、カーソルのある行を `Ctrl+F2`、右上の栞のアイコン、または右クリックの「ブックマークの追加/削除」でブックマークできます。"
+      }
+    ]
+  },
+  "scripts": {
+    "vscode:prepublish": "npm run compile",
+    "compile": "tsc -p ./",
+    "watch": "tsc -watch -p ./",
+    "test": "npm run compile && node ./out/test/parser.test.js",
+    "package": "vsce package"
+  },
+  "devDependencies": {
+    "@types/node": "^16.18.0",
+    "@types/vscode": "^1.75.0",
+    "@vscode/vsce": "^2.32.0",
+    "typescript": "^5.4.0"
+  },
+  "overrides": {
+    "cheerio": "1.0.0-rc.12"
+  }
+}

@@ -1,0 +1,216 @@
+html,
+body {
+  background-color: var(--vscode-editor-background);
+  color: var(--vscode-editor-foreground);
+}
+
+:root {
+  /* ミニマップの幅（非表示のときは 0） */
+  --tnv-minimap-width: 0px;
+}
+
+body {
+  margin: 0;
+  /* 右側はミニマップと重ならないよう、その幅だけ空ける */
+  padding: 24px calc(16px + var(--tnv-minimap-width)) 50vh 16px;
+}
+
+/* ミニマップ: 表示領域の右端に固定 */
+#minimap {
+  position: fixed;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  width: var(--tnv-minimap-width);
+  background-color: var(--vscode-minimap-background, transparent);
+  box-shadow: -1px 0 0 var(--vscode-editorWidget-border, rgba(128, 128, 128, 0.2));
+  z-index: 15;
+  cursor: default;
+}
+
+#minimap[hidden] {
+  display: none;
+}
+
+#minimap canvas {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+#content {
+  width: var(--tnv-content-width, auto);
+  max-width: 100%;
+  margin: 0 auto;
+  font-family: var(--tnv-font-family);
+  font-size: var(--tnv-font-size);
+  line-height: var(--tnv-line-height);
+  font-feature-settings: normal;
+  letter-spacing: 0;
+}
+
+.line {
+  margin: 0;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  line-break: strict;
+}
+
+/* 行番号: 本文の左の余白に表示し、1行の文字数には影響させない */
+#content.line-numbers {
+  /* 行番号とブックマークのマークが入る幅 */
+  --tnv-gutter: 4.2em;
+  padding-left: var(--tnv-gutter);
+  max-width: calc(100% - var(--tnv-gutter));
+}
+
+#content.line-numbers .line {
+  position: relative;
+}
+
+#content.line-numbers .line::before {
+  content: attr(data-n);
+  position: absolute;
+  top: 0;
+  /* 疑似要素は font-size 0.75em なので、em 指定の余白幅を 0.75 で割って本文基準に揃える */
+  left: calc(-1 * var(--tnv-gutter) / 0.75);
+  width: calc(var(--tnv-gutter) / 0.75 - 1.2em);
+  font-family: var(--vscode-editor-font-family);
+  font-size: 0.75em;
+  line-height: calc(var(--tnv-line-height) / 0.75);
+  text-align: right;
+  color: var(--vscode-editorLineNumber-foreground);
+  user-select: none;
+  pointer-events: none;
+}
+
+/* カーソルのある行の行番号 */
+#content.line-numbers .line.current::before {
+  font-weight: bold;
+  color: var(--vscode-editorLineNumber-activeForeground, var(--vscode-editor-foreground));
+}
+
+/* ブックマーク: 行番号の左（行番号が無いときは行の左の余白）に青い栞のマーク */
+:root {
+  --tnv-bookmark-icon: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Cpath fill='%233794FF' d='M4 1h8a1 1 0 0 1 1 1v13l-5-3.2L3 15V2a1 1 0 0 1 1-1z'/%3E%3C/svg%3E");
+}
+
+#content.line-numbers .line.bookmarked::before {
+  background-image: var(--tnv-bookmark-icon);
+  background-repeat: no-repeat;
+  background-position: left center;
+  /* 疑似要素の font-size(0.75em) 基準で、本文のおよそ 0.9 文字分 */
+  background-size: 1.2em 1.2em;
+}
+
+#content:not(.line-numbers) .line.bookmarked {
+  position: relative;
+}
+
+#content:not(.line-numbers) .line.bookmarked::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: -1.4em;
+  width: 1em;
+  height: calc(var(--tnv-line-height) * 1em);
+  background: var(--tnv-bookmark-icon) no-repeat center / 0.9em 0.9em;
+  pointer-events: none;
+}
+
+.line.empty::after {
+  content: "\200b";
+}
+
+ruby {
+  ruby-position: over;
+}
+
+rt {
+  font-size: 0.5em;
+  line-height: 1;
+}
+
+/* 右上の「一番上へ」「一番下へ」ボタン */
+#scroll-buttons {
+  position: fixed;
+  /* 上端・右端（スクロールバー側）から、ボタン 1 個分ほど内側。ミニマップがあるときはその左側 */
+  top: 64px;
+  right: max(72px, calc(var(--tnv-minimap-width) + 16px));
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  z-index: 20;
+  opacity: 0.45;
+  transition: opacity 0.15s;
+}
+
+#scroll-buttons:hover {
+  opacity: 1;
+}
+
+#scroll-buttons button {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 56px;
+  height: 56px;
+  padding: 0;
+  border: 1px solid var(--vscode-widget-border, transparent);
+  border-radius: 8px;
+  background-color: var(--vscode-button-secondaryBackground, var(--vscode-editorWidget-background));
+  color: var(--vscode-button-secondaryForeground, var(--vscode-editor-foreground));
+  cursor: pointer;
+}
+
+#scroll-buttons button:hover {
+  background-color: var(--vscode-button-secondaryHoverBackground, var(--vscode-toolbar-hoverBackground));
+}
+
+#scroll-buttons svg {
+  width: 32px;
+  height: 32px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.5;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+/* 閲覧専用のカーソル（選択範囲の端に描画） */
+#caret {
+  position: absolute;
+  width: 2px;
+  background-color: var(--vscode-editorCursor-foreground, var(--vscode-editor-foreground));
+  pointer-events: none;
+  z-index: 10;
+}
+
+#caret[hidden] {
+  display: none;
+}
+
+#caret.blink {
+  animation: tnv-blink 1s step-end 0.5s infinite;
+}
+
+/* 小説ビューにフォーカスが無いとき */
+#caret.inactive {
+  opacity: 0.5;
+  animation: none;
+}
+
+@keyframes tnv-blink {
+  50% {
+    opacity: 0;
+  }
+}
+
+::selection {
+  background-color: var(--vscode-editor-selectionBackground);
+}
+
+/* ルビの親文字の一部だけ色分けから外れる場合に使用 */
+.s0 {
+  color: var(--vscode-editor-foreground);
+}
