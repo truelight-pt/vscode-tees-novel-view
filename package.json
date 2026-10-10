@@ -155,6 +155,12 @@
         "icon": "$(files)"
       },
       {
+        "command": "teesNovelView.copyTitle",
+        "title": "タイトルをコピー",
+        "category": "Novel View",
+        "icon": "$(copy)"
+      },
+      {
         "command": "teesNovelView.copyBody",
         "title": "本文をコピー",
         "category": "Novel View",
@@ -268,9 +274,14 @@
           "group": "navigation"
         },
         {
+          "command": "teesNovelView.copyTitle",
+          "when": "webviewId == 'teesNovelView.preview'",
+          "group": "9_cutcopypaste@1"
+        },
+        {
           "command": "teesNovelView.copyBody",
           "when": "webviewId == 'teesNovelView.preview'",
-          "group": "9_cutcopypaste"
+          "group": "9_cutcopypaste@2"
         }
       ],
       "explorer/context": [
@@ -360,6 +371,10 @@
         {
           "command": "teesNovelView.openChanges",
           "when": "activeWebviewPanelId == 'teesNovelView.preview' && teesNovelView.hasGitChanges"
+        },
+        {
+          "command": "teesNovelView.copyTitle",
+          "when": "activeWebviewPanelId == 'teesNovelView.preview'"
         }
       ],
       "view/title": [
