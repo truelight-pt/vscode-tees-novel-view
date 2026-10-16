@@ -2,6 +2,7 @@ import * as vscode from 'vscode';
 import * as path from 'path';
 import { BookmarkStore } from './bookmarks';
 import { DEFAULT_EPISODE_PATTERN, findEpisodeNeighbors } from './episode';
+import { diffLines, LineChange, splitLines } from './lineDiff';
 import { PreviewConfig, render } from './renderer';
 
 export const VIEW_TYPE = 'teesNovelView.preview';
@@ -77,6 +78,10 @@ class NovelPreview {
   selection: SourceSelection | undefined;
   /** 次の描画で表示位置・カーソルをリセットする（別の話に切り替えたとき） */
   private resetView = false;
+  /** 表示中のファイルの監視（外部での変更を検知する） */
+  private fileWatcher: vscode.Disposable | undefined;
+  /** 最後に描画したテキスト（外部の変更で内容が変わったかの判定に使う） */
+  private renderedText: string | undefined;
 
   /**
    * @param uri 表示中のファイル（前話・次話への移動で変わる）
@@ -115,6 +120,37 @@ class NovelPreview {
       }),
       panel.onDidDispose(() => this.dispose()),
     );
+    this.watchFile();
+  }
+
+  /**
+   * 表示中のファイルを監視し、外部（別のアプリや git の操作など）で変更されたら描き直す。
+   * ソースのタブを閉じていると onDidChangeTextDocument が来ないため、ファイルそのものを監視する。
+   */
+  private watchFile(): void {
+    this.fileWatcher?.dispose();
+    const dir = this.uri.with({ path: path.posix.dirname(this.uri.path) });
+    const watcher = vscode.workspace.createFileSystemWatcher(new vscode.RelativePattern(dir, path.posix.basename(this.uri.path)));
+    const onChange = () => this.scheduleRender();
+    watcher.onDidChange(onChange);
+    watcher.onDidCreate(onChange);
+    watcher.onDidDelete(onChange);
+    this.fileWatcher = watcher;
+  }
+
+  /** 内容が最後に描画したものと違っていれば描き直す（監視で取りこぼした変更の救済） */
+  async refreshIfChanged(): Promise<void> {
+    if (!this.ready || !this.panel.visible || this.renderTimer) {
+      return;
+    }
+    try {
+      const doc = await vscode.workspace.openTextDocument(this.uri);
+      if (doc.getText() !== this.renderedText) {
+        this.scheduleRender(0);
+      }
+    } catch {
+      // 読めない場合は次の描画に任せる
+    }
   }
 
   get key(): string {
@@ -131,6 +167,7 @@ class NovelPreview {
     this.topLine = 0;
     this.lastScrollLine = -1;
     this.resetView = true;
+    this.watchFile();
     this.scheduleRender(0);
     this.manager.notifyStateChange();
   }
@@ -182,10 +219,14 @@ class NovelPreview {
       return;
     }
     let text: string;
+    let changes: LineChange[] = [];
     try {
       const doc = await vscode.workspace.openTextDocument(this.uri);
       text = doc.getText();
+      this.renderedText = text;
+      changes = await this.manager.lineChanges(this.uri, text);
     } catch (e) {
+      this.renderedText = undefined;
       text = `ファイルを読み込めませんでした: ${this.uri.fsPath}\n${(e as Error).message}`;
     }
     const config = readConfig();
@@ -198,6 +239,7 @@ class NovelPreview {
       lineNumbers: config.lineNumbers,
       reset: this.resetView,
       bookmarks: this.manager.bookmarkMarks(this.uri),
+      changes,
       minimap: {
         enabled: vscode.workspace.getConfiguration(CONFIG_SECTION).get<boolean>('minimap.enabled', true),
         width: vscode.workspace.getConfiguration(CONFIG_SECTION).get<number>('minimap.width', 80),
@@ -226,6 +268,25 @@ class NovelPreview {
     }
   }
 
+  /** 変更行の印を更新する（Git の状態が変わったとき。本文は描き直さない） */
+  async sendLineChanges(): Promise<void> {
+    if (!this.ready || !this.panel.visible) {
+      return;
+    }
+    const uri = this.uri;
+    let changes: LineChange[];
+    try {
+      const doc = await vscode.workspace.openTextDocument(uri);
+      changes = await this.manager.lineChanges(uri, doc.getText());
+    } catch {
+      return;
+    }
+    // 待っている間に別の話へ切り替わっていたら送らない
+    if (uri === this.uri) {
+      void this.panel.webview.postMessage({ type: 'changes', changes });
+    }
+  }
+
   scrollToLine(line: number): void {
     if (!this.ready || line === this.lastScrollLine) {
       return;
@@ -249,6 +310,7 @@ class NovelPreview {
 </head>
 <body>
 <main id="content"></main>
+<div id="line-changes"></div>
 <div id="caret" hidden></div>
 <div id="minimap" hidden><canvas></canvas></div>
 <div id="scroll-buttons">
@@ -264,6 +326,7 @@ class NovelPreview {
     if (this.renderTimer) {
       clearTimeout(this.renderTimer);
     }
+    this.fileWatcher?.dispose();
     this.manager.onPreviewDisposed(this);
     this.disposables.forEach((d) => d.dispose());
     this.disposables.length = 0;
@@ -286,6 +349,12 @@ export class PreviewManager implements vscode.Disposable, vscode.WebviewPanelSer
       bookmarks.onDidChange(() => this.previews.forEach((p) => p.sendBookmarks())),
       vscode.window.registerWebviewPanelSerializer(VIEW_TYPE, this),
       vscode.workspace.onDidChangeTextDocument((e) => this.get(e.document.uri)?.scheduleRender()),
+      // 別のアプリで編集して戻ってきたとき、監視で検知できなかった変更も反映する
+      vscode.window.onDidChangeWindowState((e) => {
+        if (e.focused) {
+          this.previews.forEach((p) => void p.refreshIfChanged());
+        }
+      }),
       vscode.workspace.onDidChangeConfiguration((e) => {
         if (e.affectsConfiguration(CONFIG_SECTION)) {
           this.reportedWarnings.clear();
@@ -432,6 +501,27 @@ export class PreviewManager implements vscode.Disposable, vscode.WebviewPanelSer
 
   setStoryOrder(provider: () => vscode.Uri[]): void {
     this.storyOrder = provider;
+  }
+
+  /** 変更行の比較元の内容（Git 連携から設定される） */
+  private originalText: ((uri: vscode.Uri) => Promise<string | undefined>) | undefined;
+
+  setOriginalTextProvider(provider: (uri: vscode.Uri) => Promise<string | undefined>): void {
+    this.originalText = provider;
+  }
+
+  /** 小説ビューの左端に印を付ける変更行。設定 gitChanges.enabled が OFF のときや、比較元が無いときは空 */
+  async lineChanges(uri: vscode.Uri, text: string): Promise<LineChange[]> {
+    if (!this.originalText || !vscode.workspace.getConfiguration(CONFIG_SECTION).get<boolean>('gitChanges.enabled', true)) {
+      return [];
+    }
+    const original = await this.originalText(uri);
+    return original === undefined ? [] : diffLines(splitLines(original), splitLines(text));
+  }
+
+  /** すべての小説ビューの変更行の印を更新する */
+  refreshLineChanges(): void {
+    this.previews.forEach((p) => void p.sendLineChanges());
   }
 
   /**

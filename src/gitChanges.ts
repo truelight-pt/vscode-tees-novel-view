@@ -20,6 +20,8 @@ interface GitRepositoryState {
 
 interface GitRepository {
   readonly state: GitRepositoryState;
+  /** ref が空文字のときはインデックス（ステージ済み）の内容 */
+  show(ref: string, path: string): Promise<string>;
 }
 
 interface GitAPI {
@@ -38,17 +40,31 @@ const CONTEXT_KEY = 'teesNovelView.hasGitChanges';
 /**
  * 小説ビューで表示中のファイルに Git の変更があるかを調べ、「変更を開く」ボタンの表示を切り替える。
  * テキストエディターの右上に Git 拡張機能が出すボタンと同じく、変更のあるファイルでだけ表示する。
+ * また、小説ビューの左端に変更行の印を出すため、比較元（ステージ済み）の内容を小説ビューに渡す。
  */
 export class GitChangesWatcher implements vscode.Disposable {
   private api: GitAPI | undefined;
   private readonly disposables: vscode.Disposable[] = [];
   private readonly watchedRepos = new Set<GitRepository>();
+  /** 比較元の内容（ファイルごと）。Git の状態が変わったら捨てる */
+  private readonly originals = new Map<string, Promise<string | undefined>>();
+  private readonly stateEmitter = new vscode.EventEmitter<void>();
+  /** Git の状態（変更のあるファイル）が変わったとき */
+  readonly onDidChangeState = this.stateEmitter.event;
 
   constructor(private readonly manager: PreviewManager) {
     this.disposables.push(
+      this.stateEmitter,
       vscode.commands.registerCommand('teesNovelView.openChanges', () => this.openChanges()),
+      // 物語ファイル一覧の項目から（引数はその項目のファイル）
+      vscode.commands.registerCommand('teesNovelView.openStoryChanges', (node?: { uri?: vscode.Uri }) => {
+        if (node?.uri) {
+          void vscode.commands.executeCommand('git.openChange', node.uri);
+        }
+      }),
       manager.onDidChangeState(() => this.update()),
     );
+    manager.setOriginalTextProvider((uri) => this.originalText(uri));
     void this.init();
   }
 
@@ -67,6 +83,8 @@ export class GitChangesWatcher implements vscode.Disposable {
     this.api.repositories.forEach((repo) => this.watch(repo));
     this.disposables.push(this.api.onDidOpenRepository((repo) => this.watch(repo)));
     this.update();
+    this.manager.refreshLineChanges();
+    this.stateEmitter.fire();
   }
 
   private watch(repo: GitRepository): void {
@@ -74,11 +92,38 @@ export class GitChangesWatcher implements vscode.Disposable {
       return;
     }
     this.watchedRepos.add(repo);
-    this.disposables.push(repo.state.onDidChange(() => this.update()));
+    this.disposables.push(
+      repo.state.onDidChange(() => {
+        // コミット・ステージなどで比較元が変わった可能性があるので、変更行の印を更新する
+        this.originals.clear();
+        this.update();
+        this.manager.refreshLineChanges();
+        this.stateEmitter.fire();
+      }),
+    );
+    // リポジトリが見つかる前に問い合わせた結果（比較元なし）を捨てる
+    this.originals.clear();
+    this.manager.refreshLineChanges();
+    this.stateEmitter.fire();
+  }
+
+  /**
+   * 変更行の比較元にする内容。エディターの左端の印と同じく、ステージ済み（インデックス）の内容と比べる。
+   * Git の管理下にないファイル・未追跡のファイルなどでは undefined。
+   */
+  private originalText(uri: vscode.Uri): Promise<string | undefined> {
+    const key = uri.toString();
+    let original = this.originals.get(key);
+    if (!original) {
+      const repo = this.api?.getRepository(uri);
+      original = repo ? repo.show('', uri.fsPath).catch(() => undefined) : Promise.resolve(undefined);
+      this.originals.set(key, original);
+    }
+    return original;
   }
 
   /** ファイルに Git の変更（未ステージ・ステージ済み・競合・未追跡）があるか */
-  private hasChanges(uri: vscode.Uri): boolean {
+  hasChanges(uri: vscode.Uri): boolean {
     const repo = this.api?.getRepository(uri);
     if (!repo) {
       return false;

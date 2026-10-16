@@ -13,14 +13,16 @@ export function activate(context: vscode.ExtensionContext): void {
   const bookmarks = new BookmarkStore(context.workspaceState, context.globalState, workspaceRoots);
   const manager = new PreviewManager(context.extensionUri, bookmarks);
   const storyTree = new StoryTreeProvider(manager);
+  const gitChanges = new GitChangesWatcher(manager);
   context.subscriptions.push(
     bookmarks,
     manager,
     new NovelStatusBar(manager),
     storyTree,
     new BookmarkTreeProvider(bookmarks, manager),
-    new GitChangesWatcher(manager),
+    gitChanges,
   );
+  storyTree.setGitChanges((uri) => gitChanges.hasChanges(uri), gitChanges.onDidChangeState);
 
   // 前話・次話を物語ファイル一覧の並び順で探せるようにする
   manager.setStoryOrder(() => storyTree.orderedStories());

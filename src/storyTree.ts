@@ -142,6 +142,8 @@ export class StoryTreeProvider implements vscode.TreeDataProvider<StoryNode>, vs
   private readonly infoCache = new Map<string, FileInfo>();
   private scanTimer: NodeJS.Timeout | undefined;
   private scanning: Promise<void> | undefined;
+  /** ファイルに Git の変更があるか（「変更を開く」ボタンの表示に使う） */
+  private hasGitChanges: (uri: vscode.Uri) => boolean = () => false;
 
   constructor(private readonly manager: PreviewManager) {
     this.treeView = vscode.window.createTreeView(STORY_VIEW_ID, { treeDataProvider: this, showCollapseAll: true });
@@ -206,7 +208,8 @@ export class StoryTreeProvider implements vscode.TreeDataProvider<StoryNode>, vs
     item.resourceUri = node.uri;
     item.tooltip = node.uri.fsPath;
     item.id = `file:${node.uri.toString()}`;
-    item.contextValue = 'story';
+    // Git の変更があるファイルだけ、マウスを乗せたときに「変更を開く」ボタンを出す
+    item.contextValue = this.hasGitChanges(node.uri) ? 'story.changed' : 'story';
     item.command = { command: 'teesNovelView.openStory', title: '開く', arguments: [node.uri] };
     return item;
   }
@@ -220,6 +223,13 @@ export class StoryTreeProvider implements vscode.TreeDataProvider<StoryNode>, vs
 
   getParent(node: StoryNode): StoryNode | undefined {
     return node.parent;
+  }
+
+  /** Git の変更の有無を調べる方法を設定する。onDidChange が来るたびに一覧の項目を作り直す */
+  setGitChanges(hasChanges: (uri: vscode.Uri) => boolean, onDidChange: vscode.Event<void>): void {
+    this.hasGitChanges = hasChanges;
+    this.disposables.push(onDidChange(() => this.changeEmitter.fire(undefined)));
+    this.changeEmitter.fire(undefined);
   }
 
   /** 一覧に表示されている順（上から下）の物語ファイル */

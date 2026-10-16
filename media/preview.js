@@ -235,6 +235,58 @@
     }
   }
 
+  // -------------------------------------------------------------------------
+  // Git の変更行
+  //   行の要素の中に印を入れると選択範囲の変換に影響するため、本文の外の層に重ねて描く
+  // -------------------------------------------------------------------------
+
+  const lineChangesLayer = document.getElementById('line-changes');
+  /** @type {Array<{ type: 'added' | 'modified' | 'deleted', start: number, end: number }>} */
+  let lineChanges = [];
+
+  /** 変更行の印を、各行の表示位置（折り返し後の高さを含む）に合わせて置き直す */
+  function layoutLineChanges() {
+    lineChangesLayer.textContent = '';
+    const lines = content.children;
+    if (lineChanges.length === 0 || lines.length === 0) {
+      return;
+    }
+    const scrollX = window.scrollX;
+    const scrollY = window.scrollY;
+    const fontSize = parseFloat(getComputedStyle(content).fontSize) || 16;
+    // 本文の左端から少し離す（行番号やブックマークの印と重ならない位置）
+    const left = lines[0].getBoundingClientRect().left + scrollX - Math.round(fontSize * 0.4);
+    const fragment = document.createDocumentFragment();
+    for (const change of lineChanges) {
+      const el = document.createElement('div');
+      el.className = change.type;
+      el.style.left = `${left}px`;
+      if (change.type === 'deleted') {
+        // 削除された位置（次の行の上端。末尾で削除された場合は最後の行の下端）
+        const next = lines[change.start];
+        const rect = (next || lines[lines.length - 1]).getBoundingClientRect();
+        el.style.top = `${(next ? rect.top : rect.bottom) + scrollY}px`;
+      } else {
+        const first = lines[change.start];
+        const last = lines[Math.min(change.end, lines.length) - 1];
+        if (!first || !last) {
+          continue;
+        }
+        const top = first.getBoundingClientRect().top + scrollY;
+        el.style.top = `${top}px`;
+        el.style.height = `${last.getBoundingClientRect().bottom + scrollY - top}px`;
+      }
+      fragment.appendChild(el);
+    }
+    lineChangesLayer.appendChild(fragment);
+  }
+
+  let lineChangesFrame = 0;
+  function scheduleLayoutLineChanges() {
+    cancelAnimationFrame(lineChangesFrame);
+    lineChangesFrame = requestAnimationFrame(layoutLineChanges);
+  }
+
   /** カーソルのある行に current クラスを付ける（行番号の強調表示用） */
   let currentLineEl = null;
   function updateCurrentLine() {
@@ -428,6 +480,7 @@
         content.classList.toggle('line-numbers', !!msg.lineNumbers);
         bookmarks = msg.bookmarks || [];
         applyBookmarks();
+        lineChanges = msg.changes || [];
         setMinimap(msg.minimap);
         state.uri = msg.uri;
         state.switched = msg.switched;
@@ -447,9 +500,15 @@
         }
         vscode.setState(state);
         updateCaret();
+        layoutLineChanges();
         scheduleMeasureMinimap();
         break;
       }
+      case 'changes':
+        lineChanges = msg.changes || [];
+        layoutLineChanges();
+        schedulePaintMinimap();
+        break;
       case 'scrollToLine':
         scrollToLine(msg.line);
         updateCaret();
@@ -570,6 +629,33 @@
     }
     ctx.globalAlpha = 1;
 
+    // Git の変更行（左端の縦線。削除は境目の短い横線）
+    const lineCount = minimapLayout.lineTops.length;
+    for (const change of lineChanges) {
+      if (lineCount === 0) {
+        break;
+      }
+      if (change.type === 'deleted') {
+        const index = Math.min(change.start, lineCount - 1);
+        const y = change.start < lineCount ? minimapLayout.lineTops[index] : minimapLayout.lineTops[index] + minimapLayout.lineHeights[index];
+        ctx.fillStyle = cssVar('--vscode-minimapGutter-deletedBackground', cssVar('--vscode-editorGutter-deletedBackground', '#f85149'));
+        ctx.fillRect(0, y * scale - 1, MINIMAP_PADDING + 2, 2);
+        continue;
+      }
+      const first = change.start;
+      const last = Math.min(change.end, lineCount) - 1;
+      if (first > last) {
+        continue;
+      }
+      const top = minimapLayout.lineTops[first];
+      const bottom = minimapLayout.lineTops[last] + minimapLayout.lineHeights[last];
+      ctx.fillStyle =
+        change.type === 'added'
+          ? cssVar('--vscode-minimapGutter-addedBackground', cssVar('--vscode-editorGutter-addedBackground', '#2ea043'))
+          : cssVar('--vscode-minimapGutter-modifiedBackground', cssVar('--vscode-editorGutter-modifiedBackground', '#0078d4'));
+      ctx.fillRect(0, top * scale, 3, Math.max(2, (bottom - top) * scale));
+    }
+
     // ブックマーク（青い横線）
     ctx.fillStyle = '#3794FF';
     for (const b of bookmarks) {
@@ -658,11 +744,15 @@
     schedulePaintMinimap();
   });
 
-  // 幅の変更やフォントの読み込みで折り返しが変わったら測り直す
-  new ResizeObserver(() => scheduleMeasureMinimap()).observe(content);
-  window.addEventListener('resize', scheduleMeasureMinimap);
+  // 幅の変更やフォントの読み込みで折り返しが変わったら測り直す（変更行の印も置き直す）
+  const onLayoutChange = () => {
+    scheduleMeasureMinimap();
+    scheduleLayoutLineChanges();
+  };
+  new ResizeObserver(onLayoutChange).observe(content);
+  window.addEventListener('resize', onLayoutChange);
   if (document.fonts) {
-    document.fonts.ready.then(scheduleMeasureMinimap);
+    document.fonts.ready.then(onLayoutChange);
   }
   window.addEventListener('scroll', schedulePaintMinimap);
 

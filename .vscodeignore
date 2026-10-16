@@ -8,3 +8,4 @@ out/test/**
 *.vsix
 docs/**
 CONTRIBUTING.md
+scripts/**

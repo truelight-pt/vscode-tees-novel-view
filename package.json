@@ -195,6 +195,12 @@
         "title": "変更を開く",
         "category": "Novel View",
         "icon": "$(compare-changes)"
+      },
+      {
+        "command": "teesNovelView.openStoryChanges",
+        "title": "変更を開く",
+        "category": "Novel View",
+        "icon": "$(compare-changes)"
       }
     ],
     "menus": {
@@ -317,6 +323,10 @@
           "when": "false"
         },
         {
+          "command": "teesNovelView.openStoryChanges",
+          "when": "false"
+        },
+        {
           "command": "teesNovelView.toggleBookmark",
           "when": "activeWebviewPanelId == 'teesNovelView.preview'"
         },
@@ -415,6 +425,16 @@
         }
       ],
       "view/item/context": [
+        {
+          "command": "teesNovelView.openStoryChanges",
+          "when": "view == teesNovelView.stories && viewItem == story.changed",
+          "group": "inline@1"
+        },
+        {
+          "command": "teesNovelView.openStoryChanges",
+          "when": "view == teesNovelView.stories && viewItem == story.changed",
+          "group": "1_open@1"
+        },
         {
           "command": "teesNovelView.renameBookmark",
           "when": "view == teesNovelView.bookmarks && viewItem == bookmark",
@@ -753,6 +773,12 @@
           "order": 6,
           "markdownDescription": "ミニマップの幅（px）。"
         },
+        "teesNovelView.gitChanges.enabled": {
+          "type": "boolean",
+          "default": true,
+          "order": 7,
+          "markdownDescription": "テキストエディターと同じように、Git で変更された行の左端に印を表示します（追加は緑、変更は青の線、削除は赤の三角形）。ステージ済みの内容（ステージしていなければ最後のコミット）と比べた変更で、保存前の編集も反映されます。ミニマップにも表示します。"
+        },
         "teesNovelView.episode.followStoryList": {
           "type": "boolean",
           "default": false,
@@ -802,7 +828,8 @@
     "compile": "tsc -p ./",
     "watch": "tsc -watch -p ./",
     "test": "npm run compile && node ./out/test/parser.test.js",
-    "package": "vsce package"
+    "package": "vsce package",
+    "package:release": "node scripts/check-release.js && vsce package"
   },
   "devDependencies": {
     "@types/node": "^16.18.0",

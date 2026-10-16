@@ -3,6 +3,7 @@ import { computeStyles, countChars, parseRubyLine, Segment } from '../parser';
 import { render } from '../renderer';
 import { DEFAULT_EPISODE_PATTERN, findEpisodeNeighbors } from '../episode';
 import { adjustLine } from '../lineAdjust';
+import { diffLines, LineChange, splitLines } from '../lineDiff';
 import { extractEpisodeTitle, globToRegExp, isExcluded, looksLikeStory, naturalCompare, selectStoryFiles } from '../storyDetect';
 
 type Plain = { kind: 'text'; text: string } | { kind: 'ruby'; base: string; rt: string };
@@ -298,6 +299,31 @@ test('同じ行の途中の編集では変わらない', () => assert.strictEqua
 test('行頭に改行を挿入すると文章と一緒に下へ', () => assert.strictEqual(adjustLine(10, edit(10, 0, 10, true, 1)), 11));
 test('行末に改行を挿入しても変わらない', () => assert.strictEqual(adjustLine(10, edit(10, 20, 10, true, 1)), 10));
 test('ブックマーク行を含む範囲の削除は範囲の先頭へ', () => assert.strictEqual(adjustLine(10, edit(8, 3, 12, false, 0)), 8));
+
+console.log('\n変更行（Git の差分）');
+const diff = (before: string, after: string): LineChange[] => diffLines(splitLines(before), splitLines(after));
+test('変更なし', () => assert.deepStrictEqual(diff('a\nb\nc', 'a\nb\nc'), []));
+test('行の変更', () => assert.deepStrictEqual(diff('a\nb\nc', 'a\nB\nc'), [{ type: 'modified', start: 1, end: 2 }]));
+test('行の追加', () => assert.deepStrictEqual(diff('a\nc', 'a\nb1\nb2\nc'), [{ type: 'added', start: 1, end: 3 }]));
+test('行の削除', () => assert.deepStrictEqual(diff('a\nb\nc', 'a\nc'), [{ type: 'deleted', start: 1, end: 1 }]));
+test('末尾の行の削除', () => assert.deepStrictEqual(diff('a\nb\nc', 'a\nb'), [{ type: 'deleted', start: 2, end: 2 }]));
+test('先頭への追加', () => assert.deepStrictEqual(diff('a\nb', 'x\na\nb'), [{ type: 'added', start: 0, end: 1 }]));
+test('改行コードの違いは無視', () => assert.deepStrictEqual(diff('a\r\nb\r\n', 'a\nb\n'), []));
+test('離れた複数の変更', () =>
+  assert.deepStrictEqual(diff('1\n2\n3\n4\n5\n6\n7', '1\nX\n3\n4\n5\n7\n8'), [
+    { type: 'modified', start: 1, end: 2 },
+    { type: 'deleted', start: 5, end: 5 },
+    { type: 'added', start: 6, end: 7 },
+  ]));
+test('削除と追加が隣り合うと変更', () =>
+  assert.deepStrictEqual(diff('a\nb\nc\nd', 'a\nX\nY\nZ\nd'), [{ type: 'modified', start: 1, end: 4 }]));
+test('一致行を挟んだ変更は別々', () =>
+  assert.deepStrictEqual(diff('a\nb\nc\nd\ne', 'a\nB\nc\nD\ne'), [
+    { type: 'modified', start: 1, end: 2 },
+    { type: 'modified', start: 3, end: 4 },
+  ]));
+test('差分が大きすぎるときは全体を変更とみなす', () =>
+  assert.deepStrictEqual(diffLines(['a', 'b', 'c', 'd'], ['a', 'x', 'c', 'y'], 1), [{ type: 'modified', start: 1, end: 4 }]));
 
 if (failed > 0) {
   console.error(`\n${failed} 件失敗`);
