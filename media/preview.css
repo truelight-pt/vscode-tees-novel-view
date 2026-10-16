@@ -118,6 +118,36 @@ body {
   pointer-events: none;
 }
 
+/* Git の変更行: 本文の左に、エディターと同じ色の細い線（削除は行の境目に三角形） */
+#line-changes {
+  position: absolute;
+  top: 0;
+  left: 0;
+  pointer-events: none;
+}
+
+#line-changes > div {
+  position: absolute;
+  width: 3px;
+}
+
+#line-changes .added {
+  background-color: var(--vscode-editorGutter-addedBackground, #2ea043);
+}
+
+#line-changes .modified {
+  background-color: var(--vscode-editorGutter-modifiedBackground, #0078d4);
+}
+
+#line-changes .deleted {
+  width: 0;
+  height: 0;
+  margin-top: -4px;
+  border-top: 4px solid transparent;
+  border-bottom: 4px solid transparent;
+  border-left: 4px solid var(--vscode-editorGutter-deletedBackground, #f85149);
+}
+
 .line.empty::after {
   content: "\200b";
 }

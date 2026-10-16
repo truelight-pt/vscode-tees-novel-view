@@ -1,6 +1,7 @@
 import * as vscode from 'vscode';
 import { BookmarkStore } from './bookmarks';
 import { BookmarkTreeProvider } from './bookmarkTree';
+import { GitChangesWatcher } from './gitChanges';
 import { isTxt, PreviewManager } from './preview';
 import { NovelStatusBar } from './statusBar';
 import { storyRoots, StoryTreeProvider } from './storyTree';
@@ -12,7 +13,16 @@ export function activate(context: vscode.ExtensionContext): void {
   const bookmarks = new BookmarkStore(context.workspaceState, context.globalState, workspaceRoots);
   const manager = new PreviewManager(context.extensionUri, bookmarks);
   const storyTree = new StoryTreeProvider(manager);
-  context.subscriptions.push(bookmarks, manager, new NovelStatusBar(manager), storyTree, new BookmarkTreeProvider(bookmarks, manager));
+  const gitChanges = new GitChangesWatcher(manager);
+  context.subscriptions.push(
+    bookmarks,
+    manager,
+    new NovelStatusBar(manager),
+    storyTree,
+    new BookmarkTreeProvider(bookmarks, manager),
+    gitChanges,
+  );
+  storyTree.setGitChanges((uri) => gitChanges.hasChanges(uri), gitChanges.onDidChangeState);
 
   // 前話・次話を物語ファイル一覧の並び順で探せるようにする
   manager.setStoryOrder(() => storyTree.orderedStories());
@@ -71,6 +81,21 @@ export function activate(context: vscode.ExtensionContext): void {
       if (preview) {
         await manager.openEpisode(preview, 1);
       }
+    }),
+    vscode.commands.registerCommand('teesNovelView.copyTitle', async () => {
+      const preview = manager.activePreview ?? manager.editorPreview;
+      if (!preview) {
+        return;
+      }
+      // 元のテキストの 1 行目（ルビ記法・字下げも書かれたまま。改行は含めない）
+      const doc = await vscode.workspace.openTextDocument(preview.uri);
+      const title = doc.lineAt(0).text;
+      if (!title) {
+        vscode.window.setStatusBarMessage('1 行目が空のため、コピーするタイトルがありません', 3000);
+        return;
+      }
+      await vscode.env.clipboard.writeText(title);
+      vscode.window.setStatusBarMessage(`タイトルをコピーしました: ${title}`, 3000);
     }),
     vscode.commands.registerCommand('teesNovelView.copyBody', async () => {
       const preview = manager.activePreview ?? manager.editorPreview;
