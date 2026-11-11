@@ -9,3 +9,4 @@ out/test/**
 docs/**
 CONTRIBUTING.md
 scripts/**
+temp/**

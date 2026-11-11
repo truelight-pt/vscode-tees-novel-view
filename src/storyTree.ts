@@ -1,5 +1,6 @@
 import * as vscode from 'vscode';
 import * as path from 'path';
+import { countChars } from './parser';
 import { PreviewManager } from './preview';
 import { extractEpisodeTitle, globToRegExp, isExcluded, looksLikeStory, naturalCompare, selectStoryFiles } from './storyDetect';
 
@@ -21,6 +22,8 @@ type StoryNode =
       label: string;
       /** ファイル先頭の「第〇話　タイトル」のタイトル部分 */
       title?: string;
+      /** ルビ・改行・空白を除いた文字数 */
+      chars?: number;
       parent?: StoryNode;
     };
 
@@ -29,6 +32,7 @@ interface FileInfo {
   mtime: number;
   story: boolean;
   title?: string;
+  chars?: number;
 }
 
 interface StoriesConfig {
@@ -37,6 +41,12 @@ interface StoriesConfig {
   /** 物語ファイルのあるフォルダーの .txt をすべて物語ファイルとする */
   detectByFolder: boolean;
   exclude: RegExp[];
+}
+
+/** 一覧のフォルダーと、その中（サブフォルダーを含む）の物語ファイル */
+export interface StoryFolder {
+  label: string;
+  files: vscode.Uri[];
 }
 
 /** 物語ファイル一覧の探索先（設定 stories.roots。未設定ならワークスペースのフォルダー） */
@@ -70,7 +80,7 @@ function readConfig(): StoriesConfig {
 }
 
 /** 物語ファイルの相対パスからツリーを組み立てる（フォルダーが先、番号順） */
-function buildTree(stories: string[], toUri: (rel: string) => vscode.Uri, titles: Map<string, string>): StoryNode[] {
+function buildTree(stories: string[], toUri: (rel: string) => vscode.Uri, infos: Map<string, FileInfo>): StoryNode[] {
   const top: StoryNode[] = [];
   const folders = new Map<string, StoryNode & { kind: 'folder' }>();
   const split = (rel: string) => {
@@ -99,7 +109,8 @@ function buildTree(stories: string[], toUri: (rel: string) => vscode.Uri, titles
       kind: 'file',
       uri: toUri(rel),
       label: name.replace(/\.txt$/i, ''),
-      title: titles.get(rel),
+      title: infos.get(rel)?.title,
+      chars: infos.get(rel)?.chars,
       parent,
     });
   }
@@ -111,15 +122,14 @@ function buildTree(stories: string[], toUri: (rel: string) => vscode.Uri, titles
   return top;
 }
 
-/** バイト列の先頭を文字列にする。UTF-8 として不正なら Shift_JIS とみなす */
-function decodeHead(bytes: Uint8Array): string {
-  const head = bytes.subarray(0, SNIFF_BYTES);
+/** バイト列を文字列にする。UTF-8 として不正なら Shift_JIS とみなす */
+function decode(bytes: Uint8Array): string {
   try {
     // stream: true で、途中で切れたマルチバイト文字をエラーにしない
-    return new TextDecoder('utf-8', { fatal: true }).decode(head, { stream: true });
+    return new TextDecoder('utf-8', { fatal: true }).decode(bytes, { stream: true });
   } catch {
     try {
-      return new TextDecoder('shift_jis').decode(head);
+      return new TextDecoder('shift_jis').decode(bytes);
     } catch {
       return '';
     }
@@ -144,6 +154,8 @@ export class StoryTreeProvider implements vscode.TreeDataProvider<StoryNode>, vs
   private scanning: Promise<void> | undefined;
   /** ファイルに Git の変更があるか（「変更を開く」ボタンの表示に使う） */
   private hasGitChanges: (uri: vscode.Uri) => boolean = () => false;
+  /** ファイルに編集投稿 URL があるか（「編集投稿」ボタンの表示に使う） */
+  private hasEditUrl: (uri: vscode.Uri) => boolean = () => false;
 
   constructor(private readonly manager: PreviewManager) {
     this.treeView = vscode.window.createTreeView(STORY_VIEW_ID, { treeDataProvider: this, showCollapseAll: true });
@@ -158,7 +170,17 @@ export class StoryTreeProvider implements vscode.TreeDataProvider<StoryNode>, vs
       vscode.commands.registerCommand('teesNovelView.openStory', (uri: vscode.Uri) => this.openStory(uri)),
       vscode.commands.registerCommand('teesNovelView.openStoriesAsText', () => this.setOpenInNovelView(false)),
       vscode.commands.registerCommand('teesNovelView.openStoriesInNovelView', () => this.setOpenInNovelView(true)),
+      vscode.commands.registerCommand('teesNovelView.showStoryCharCount', () => this.setShowCharCount(true)),
+      vscode.commands.registerCommand('teesNovelView.hideStoryCharCount', () => this.setShowCharCount(false)),
       vscode.workspace.onDidChangeConfiguration((e) => {
+        if (e.affectsConfiguration(`${CONFIG_SECTION}.stories.showCharCount`)) {
+          this.changeEmitter.fire(undefined);
+        }
+        // 丸括弧のルビの扱いが変わると文字数が変わるので、数え直す
+        if (e.affectsConfiguration(`${CONFIG_SECTION}.ruby.parentheses`)) {
+          this.infoCache.clear();
+          this.scheduleScan(0);
+        }
         // 一覧の内容に関わる設定だけで再走査する（開き方の切り替えでは再走査しない）
         const scanKeys = ['roots', 'autoDetect', 'detectByFolder', 'exclude'];
         if (scanKeys.some((k) => e.affectsConfiguration(`${CONFIG_SECTION}.stories.${k}`))) {
@@ -201,15 +223,17 @@ export class StoryTreeProvider implements vscode.TreeDataProvider<StoryNode>, vs
       item.id = `folder:${node.uri.toString()}`;
       return item;
     }
-    // ファイル名の右に、半角スペースで区切ってタイトルを表示する
-    const item = new vscode.TreeItem(node.title ? `${node.label} ${node.title}` : node.label, vscode.TreeItemCollapsibleState.None);
+    // ファイル名の右に、半角スペースで区切って文字数（括弧付き）とタイトルを表示する
+    const showChars = node.chars !== undefined && vscode.workspace.getConfiguration(CONFIG_SECTION).get<boolean>('stories.showCharCount', true);
+    const chars = showChars ? ` (${node.chars!.toLocaleString('en-US')})` : '';
+    const item = new vscode.TreeItem(`${node.label}${chars}${node.title ? ` ${node.title}` : ''}`, vscode.TreeItemCollapsibleState.None);
     item.iconPath = new vscode.ThemeIcon('book');
     // ファイルの場所を設定すると、Git の変更状態などの色と記号（M・U など）が付く
     item.resourceUri = node.uri;
     item.tooltip = node.uri.fsPath;
     item.id = `file:${node.uri.toString()}`;
-    // Git の変更があるファイルだけ、マウスを乗せたときに「変更を開く」ボタンを出す
-    item.contextValue = this.hasGitChanges(node.uri) ? 'story.changed' : 'story';
+    // Git の変更があるファイルだけ「変更を開く」、編集投稿 URL があるファイルだけ「編集投稿」のボタンをマウスを乗せたときに出す
+    item.contextValue = `story${this.hasGitChanges(node.uri) ? '.changed' : ''}${this.hasEditUrl(node.uri) ? '.editUrl' : ''}`;
     item.command = { command: 'teesNovelView.openStory', title: '開く', arguments: [node.uri] };
     return item;
   }
@@ -232,15 +256,39 @@ export class StoryTreeProvider implements vscode.TreeDataProvider<StoryNode>, vs
     this.changeEmitter.fire(undefined);
   }
 
+  /** 編集投稿 URL の有無を調べる方法を設定する。onDidChange が来るたびに一覧の項目を作り直す */
+  setEditUrls(hasEditUrl: (uri: vscode.Uri) => boolean, onDidChange: vscode.Event<void>): void {
+    this.hasEditUrl = hasEditUrl;
+    this.disposables.push(onDidChange(() => this.changeEmitter.fire(undefined)));
+    this.changeEmitter.fire(undefined);
+  }
+
   /** 一覧に表示されている順（上から下）の物語ファイル */
   orderedStories(): vscode.Uri[] {
-    const result: vscode.Uri[] = [];
+    return this.storiesIn(this.roots);
+  }
+
+  private storiesIn(nodes: StoryNode[]): vscode.Uri[] {
+    return nodes.flatMap((n) => (n.kind === 'folder' ? this.storiesIn(n.children) : [n.uri]));
+  }
+
+  /**
+   * 一括設定の対象にできるフォルダー。一覧の最上位に直接ファイルがあれば、探索先全体も候補にする。
+   * サブフォルダーを 1 つ持つだけのフォルダーは、そのサブフォルダーと中身が同じなので除く。
+   */
+  storyFolders(): StoryFolder[] {
+    const result: StoryFolder[] = [];
+    if (this.roots.some((n) => n.kind === 'file')) {
+      const label = path.posix.basename(storyRoots()[0]?.path ?? '') || '物語ファイル一覧';
+      result.push({ label, files: this.storiesIn(this.roots) });
+    }
     const walk = (nodes: StoryNode[]) => {
       for (const n of nodes) {
         if (n.kind === 'folder') {
+          if (n.children.length !== 1 || n.children[0].kind !== 'folder') {
+            result.push({ label: vscode.workspace.asRelativePath(n.uri), files: this.storiesIn(n.children) });
+          }
           walk(n.children);
-        } else {
-          result.push(n.uri);
         }
       }
     };
@@ -312,17 +360,14 @@ export class StoryTreeProvider implements vscode.TreeDataProvider<StoryNode>, vs
         stories = config.detectByFolder ? selectStoryFiles(files, detected) : detected;
       }
 
-      // 3. 先頭の「第〇話　タイトル」からタイトルを取り出す
-      const titles = new Map<string, string>();
+      // 3. 先頭の「第〇話　タイトル」からタイトルを取り出し、文字数を数える
+      const infos = new Map<string, FileInfo>();
       for (const rel of stories) {
-        const title = (await this.readInfo(toUri(rel))).title;
-        if (title) {
-          titles.set(rel, title);
-        }
+        infos.set(rel, await this.readInfo(toUri(rel)));
       }
 
       // 4. ツリーを組み立てる
-      const children = buildTree(stories, toUri, titles);
+      const children = buildTree(stories, toUri, infos);
       if (multiRoot) {
         if (children.length > 0) {
           const node: StoryNode = { kind: 'folder', uri: rootUri, label: path.posix.basename(rootUri.path) || rootUri.fsPath, children };
@@ -378,7 +423,7 @@ export class StoryTreeProvider implements vscode.TreeDataProvider<StoryNode>, vs
     }
   }
 
-  /** ファイル先頭を読んで、物語らしいかとタイトルを返す（更新日時が変わるまでキャッシュ） */
+  /** ファイルを読んで、物語らしいか・タイトル・文字数を返す（更新日時が変わるまでキャッシュ） */
   private async readInfo(uri: vscode.Uri): Promise<FileInfo> {
     const key = uri.toString();
     try {
@@ -387,8 +432,15 @@ export class StoryTreeProvider implements vscode.TreeDataProvider<StoryNode>, vs
       if (cached && cached.mtime === stat.mtime) {
         return cached;
       }
-      const head = decodeHead(await vscode.workspace.fs.readFile(uri));
-      const info = { mtime: stat.mtime, story: looksLikeStory(head), title: extractEpisodeTitle(head) };
+      const bytes = await vscode.workspace.fs.readFile(uri);
+      const head = decode(bytes.subarray(0, SNIFF_BYTES));
+      const parentheses = vscode.workspace.getConfiguration(CONFIG_SECTION).get<boolean>('ruby.parentheses', false);
+      const info = {
+        mtime: stat.mtime,
+        story: looksLikeStory(head),
+        title: extractEpisodeTitle(head),
+        chars: countChars(decode(bytes), { parentheses }),
+      };
       this.infoCache.set(key, info);
       return info;
     } catch {
@@ -412,6 +464,11 @@ export class StoryTreeProvider implements vscode.TreeDataProvider<StoryNode>, vs
   private async setOpenInNovelView(value: boolean): Promise<void> {
     await vscode.workspace.getConfiguration(CONFIG_SECTION).update('stories.openInNovelView', value, vscode.ConfigurationTarget.Global);
     vscode.window.setStatusBarMessage(`物語ファイル一覧: ${value ? '小説ビュー' : 'テキストファイル'}で開きます`, 3000);
+  }
+
+  private async setShowCharCount(value: boolean): Promise<void> {
+    await vscode.workspace.getConfiguration(CONFIG_SECTION).update('stories.showCharCount', value, vscode.ConfigurationTarget.Global);
+    vscode.window.setStatusBarMessage(`物語ファイル一覧: 文字数を${value ? '表示します' : '表示しません'}`, 3000);
   }
 
   /** 表示中の小説ビュー（またはテキストエディター）のファイルを一覧で選択状態にする */

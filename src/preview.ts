@@ -190,6 +190,9 @@ class NovelPreview {
         this.lastScrollLine = -1;
         this.scheduleRender(0);
         break;
+      case 'openEditUrl':
+        void vscode.commands.executeCommand('teesNovelView.openEditUrl', { uri: this.uri });
+        break;
       case 'selection':
         if (msg.selection) {
           this.selection = msg.selection;
@@ -239,6 +242,7 @@ class NovelPreview {
       lineNumbers: config.lineNumbers,
       reset: this.resetView,
       bookmarks: this.manager.bookmarkMarks(this.uri),
+      hasEditUrl: this.manager.hasEditUrl(this.uri),
       changes,
       minimap: {
         enabled: vscode.workspace.getConfiguration(CONFIG_SECTION).get<boolean>('minimap.enabled', true),
@@ -265,6 +269,13 @@ class NovelPreview {
   sendBookmarks(): void {
     if (this.ready) {
       void this.panel.webview.postMessage({ type: 'bookmarks', bookmarks: this.manager.bookmarkMarks(this.uri) });
+    }
+  }
+
+  /** 「編集投稿」ボタンの表示を更新する */
+  sendEditUrl(): void {
+    if (this.ready) {
+      void this.panel.webview.postMessage({ type: 'editUrl', hasEditUrl: this.manager.hasEditUrl(this.uri) });
     }
   }
 
@@ -313,6 +324,7 @@ class NovelPreview {
 <div id="line-changes"></div>
 <div id="caret" hidden></div>
 <div id="minimap" hidden><canvas></canvas></div>
+<button id="edit-url" type="button" tabindex="-1" title="編集投稿" aria-label="編集投稿" hidden><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M9 2.5h4.5V7M13.5 2.5 7.5 8.5M12 9.5v4H2.5V4h4"/></svg></button>
 <div id="scroll-buttons">
 <button id="scroll-top" type="button" tabindex="-1" title="一番上へ" aria-label="一番上へ"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M3 3h10M8 13V6M4.5 9.5 8 6l3.5 3.5"/></svg></button>
 <button id="scroll-bottom" type="button" tabindex="-1" title="一番下へ" aria-label="一番下へ"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M3 13h10M8 3v7M4.5 6.5 8 10l3.5-3.5"/></svg></button>
@@ -340,6 +352,8 @@ export class PreviewManager implements vscode.Disposable, vscode.WebviewPanelSer
   /** 小説ビューのアクティブ状態・表示ファイル・カーソルが変わったとき */
   readonly onDidChangeState = this.stateEmitter.event;
   private readonly reportedWarnings = new Set<string>();
+  /** ファイルに編集投稿 URL があるか（「編集投稿」ボタンの表示に使う） */
+  hasEditUrl: (uri: vscode.Uri) => boolean = () => false;
 
   constructor(
     readonly extensionUri: vscode.Uri,
@@ -592,6 +606,13 @@ export class PreviewManager implements vscode.Disposable, vscode.WebviewPanelSer
       return;
     }
     await this.replaceFile(preview, target, false);
+  }
+
+  /** 編集投稿 URL の有無を調べる方法を設定する。onDidChange が来るたびにボタンの表示を更新する */
+  setEditUrls(hasEditUrl: (uri: vscode.Uri) => boolean, onDidChange: vscode.Event<void>): void {
+    this.hasEditUrl = hasEditUrl;
+    this.disposables.push(onDidChange(() => this.previews.forEach((p) => p.sendEditUrl())));
+    this.previews.forEach((p) => p.sendEditUrl());
   }
 
   /** 小説ビューに表示するブックマーク（行番号と名前） */

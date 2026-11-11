@@ -4,6 +4,7 @@
   const content = document.getElementById('content');
   const dynamicStyle = document.getElementById('dynamic-style');
   const caret = document.getElementById('caret');
+  const editUrlButton = document.getElementById('edit-url');
 
   /**
    * 元テキスト上の位置 { line, col }（col は UTF-16 単位）
@@ -481,6 +482,7 @@
         bookmarks = msg.bookmarks || [];
         applyBookmarks();
         lineChanges = msg.changes || [];
+        editUrlButton.hidden = !msg.hasEditUrl;
         setMinimap(msg.minimap);
         state.uri = msg.uri;
         state.switched = msg.switched;
@@ -508,6 +510,9 @@
         lineChanges = msg.changes || [];
         layoutLineChanges();
         schedulePaintMinimap();
+        break;
+      case 'editUrl':
+        editUrlButton.hidden = !msg.hasEditUrl;
         break;
       case 'scrollToLine':
         scrollToLine(msg.line);
@@ -773,6 +778,14 @@
     const bottom = last ? last.offsetTop + last.offsetHeight + 24 : document.documentElement.scrollHeight;
     window.scrollTo(0, Math.max(0, bottom - window.innerHeight));
   });
+
+  // -------------------------------------------------------------------------
+  // 左上の「編集投稿」ボタン
+  // -------------------------------------------------------------------------
+
+  // ボタンを押しても本文の選択範囲（カーソル）が消えないようにする
+  editUrlButton.addEventListener('mousedown', (event) => event.preventDefault());
+  editUrlButton.addEventListener('click', () => vscode.postMessage({ type: 'openEditUrl' }));
 
   let scrollTimer = 0;
   window.addEventListener('scroll', () => {

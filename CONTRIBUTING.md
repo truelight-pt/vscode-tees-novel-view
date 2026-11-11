@@ -25,7 +25,7 @@ npm run package
 `tees-novel-view-<version>.vsix` が作成されます。VS Code の拡張機能ビューの「…」メニュー →「VSIX からのインストール…」、または次のコマンドでインストールできます。
 
 ```bash
-code --install-extension tees-novel-view-1.1.0.vsix --force
+code --install-extension tees-novel-view-1.2.0.vsix --force
 ```
 
 `--force` を付けると、同じバージョンがインストール済みでも上書きします（開発中の版を入れ直すとき）。インストール後はウィンドウを再読み込みしてください。
@@ -64,6 +64,7 @@ code --install-extension tees-novel-view-1.1.0.vsix --force
 | `src/bookmarks.ts` / `src/bookmarkTree.ts` / `src/lineAdjust.ts` | ブックマークの保存・一覧・編集に合わせた行の追従 |
 | `src/episode.ts` | ファイル名の番号から前話・次話を探す処理 |
 | `src/statusBar.ts` | ステータスバーの文字数・カーソル行 |
+| `src/editUrl.ts` / `src/editUrlStore.ts` | 編集投稿 URL（エピソード一覧の HTML ソースからの抽出とファイルとの照合 / 保存・コマンド） |
 | `src/gitChanges.ts` / `src/lineDiff.ts` | Git 拡張機能との連携（「変更を開く」、変更行の印）と、行単位の差分 |
 | `src/test/parser.test.ts` | 単体テスト（vscode に依存しないロジックが対象） |
 | `media/preview.js` / `media/preview.css` | 小説ビューの画面（カーソル、ミニマップなど） |

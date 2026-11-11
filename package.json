@@ -2,7 +2,7 @@
   "name": "tees-novel-view",
   "displayName": "Tee's Novel View",
   "description": "テキストファイル(.txt)を小説として閲覧するための「小説ビュー」。「小説家になろう」形式のルビ表示と、会話文・心の声などの色分けに対応。",
-  "version": "1.1.0",
+  "version": "1.2.0",
   "publisher": "Tees-software",
   "icon": "media/icon.png",
   "license": "MIT",
@@ -179,6 +179,18 @@
         "icon": "$(file-text)"
       },
       {
+        "command": "teesNovelView.hideStoryCharCount",
+        "title": "文字数: 表示（クリックで非表示）",
+        "category": "Novel View",
+        "icon": "$(symbol-numeric)"
+      },
+      {
+        "command": "teesNovelView.showStoryCharCount",
+        "title": "文字数: 非表示（クリックで表示）",
+        "category": "Novel View",
+        "icon": "$(eye-closed)"
+      },
+      {
         "command": "teesNovelView.enableFollowStoryList",
         "title": "前話・次話: 同じフォルダー内（クリックで物語ファイル一覧の順に切り替え）",
         "category": "Novel View",
@@ -201,6 +213,24 @@
         "title": "変更を開く",
         "category": "Novel View",
         "icon": "$(compare-changes)"
+      },
+      {
+        "command": "teesNovelView.openEditUrl",
+        "title": "編集投稿",
+        "category": "Novel View",
+        "icon": "$(link-external)"
+      },
+      {
+        "command": "teesNovelView.setEditUrl",
+        "title": "編集投稿URL設定",
+        "category": "Novel View",
+        "icon": "$(edit)"
+      },
+      {
+        "command": "teesNovelView.importEditUrls",
+        "title": "編集投稿URL一括設定",
+        "category": "Novel View",
+        "icon": "$(clippy)"
       }
     ],
     "menus": {
@@ -327,6 +357,14 @@
           "when": "false"
         },
         {
+          "command": "teesNovelView.openEditUrl",
+          "when": "false"
+        },
+        {
+          "command": "teesNovelView.setEditUrl",
+          "when": "false"
+        },
+        {
           "command": "teesNovelView.toggleBookmark",
           "when": "activeWebviewPanelId == 'teesNovelView.preview'"
         },
@@ -371,6 +409,14 @@
           "when": "!config.teesNovelView.stories.openInNovelView"
         },
         {
+          "command": "teesNovelView.hideStoryCharCount",
+          "when": "config.teesNovelView.stories.showCharCount"
+        },
+        {
+          "command": "teesNovelView.showStoryCharCount",
+          "when": "!config.teesNovelView.stories.showCharCount"
+        },
+        {
           "command": "teesNovelView.enableFollowStoryList",
           "when": "!config.teesNovelView.episode.followStoryList"
         },
@@ -391,12 +437,17 @@
         {
           "command": "teesNovelView.refreshStories",
           "when": "view == teesNovelView.stories",
-          "group": "navigation@1"
+          "group": "navigation@2"
+        },
+        {
+          "command": "teesNovelView.importEditUrls",
+          "when": "view == teesNovelView.stories",
+          "group": "navigation@3"
         },
         {
           "command": "teesNovelView.openStoriesSettings",
           "when": "view == teesNovelView.stories",
-          "group": "navigation@2"
+          "group": "navigation@4"
         },
         {
           "command": "teesNovelView.clearBookmarks",
@@ -422,18 +473,43 @@
           "command": "teesNovelView.openStoriesInNovelView",
           "when": "view == teesNovelView.stories && !config.teesNovelView.stories.openInNovelView",
           "group": "navigation@0"
+        },
+        {
+          "command": "teesNovelView.hideStoryCharCount",
+          "when": "view == teesNovelView.stories && config.teesNovelView.stories.showCharCount",
+          "group": "navigation@1"
+        },
+        {
+          "command": "teesNovelView.showStoryCharCount",
+          "when": "view == teesNovelView.stories && !config.teesNovelView.stories.showCharCount",
+          "group": "navigation@1"
         }
       ],
       "view/item/context": [
         {
           "command": "teesNovelView.openStoryChanges",
-          "when": "view == teesNovelView.stories && viewItem == story.changed",
+          "when": "view == teesNovelView.stories && viewItem =~ /^story\\.changed/",
           "group": "inline@1"
         },
         {
           "command": "teesNovelView.openStoryChanges",
-          "when": "view == teesNovelView.stories && viewItem == story.changed",
+          "when": "view == teesNovelView.stories && viewItem =~ /^story\\.changed/",
           "group": "1_open@1"
+        },
+        {
+          "command": "teesNovelView.openEditUrl",
+          "when": "view == teesNovelView.stories && viewItem =~ /\\.editUrl$/",
+          "group": "inline@2"
+        },
+        {
+          "command": "teesNovelView.openEditUrl",
+          "when": "view == teesNovelView.stories && viewItem =~ /\\.editUrl$/",
+          "group": "2_editUrl@1"
+        },
+        {
+          "command": "teesNovelView.setEditUrl",
+          "when": "view == teesNovelView.stories && viewItem =~ /^story/",
+          "group": "3_setEditUrl@1"
         },
         {
           "command": "teesNovelView.renameBookmark",
@@ -758,6 +834,12 @@
           "default": true,
           "order": 59,
           "markdownDescription": "物語ファイル一覧でファイルをクリックしたとき、小説ビューで開きます。OFF の場合は元のテキストファイルをエディターで開きます。一覧の右上のボタンでも切り替えられます。"
+        },
+        "teesNovelView.stories.showCharCount": {
+          "type": "boolean",
+          "default": true,
+          "order": 59,
+          "markdownDescription": "物語ファイル一覧で、ファイル名とタイトルの間に文字数（ルビ・改行・空白を除く）を `第01話 (3,456) タイトル` の形で表示します。一覧の右上のボタンでも切り替えられます。"
         },
         "teesNovelView.minimap.enabled": {
           "type": "boolean",

@@ -1,6 +1,7 @@
 import * as assert from 'assert';
 import { computeStyles, countChars, parseRubyLine, Segment } from '../parser';
 import { render } from '../renderer';
+import { isWebUrl, matchEpisodes, parseEpisodeListPage } from '../editUrl';
 import { DEFAULT_EPISODE_PATTERN, findEpisodeNeighbors } from '../episode';
 import { adjustLine } from '../lineAdjust';
 import { diffLines, LineChange, splitLines } from '../lineDiff';
@@ -324,6 +325,73 @@ test('一致行を挟んだ変更は別々', () =>
   ]));
 test('差分が大きすぎるときは全体を変更とみなす', () =>
   assert.deepStrictEqual(diffLines(['a', 'b', 'c', 'd'], ['a', 'x', 'c', 'y'], 1), [{ type: 'modified', start: 1, end: 4 }]));
+
+console.log('editUrl');
+const episodeItem = (no: number) =>
+  `<li class="c-up-panel__list-item p-up-episode-item js-no_${no}"><div class="p-up-episode-item__title">` +
+  `<a href="/usernoveldatamanage/top/ncode/1/noveldataid/${no}/"><span class="c-up-label c-up-label--episode-no">ep.${no}</span>&nbsp;第${no}話</a></div>` +
+  `<a class="p-up-episode-item__edit" href="/usernoveldatamanage/updateinput/ncode/1/noveldataid/${no}/">編集</a></li>`;
+const editUrlOf = (no: number) => `https://syosetu.com/usernoveldatamanage/updateinput/ncode/1/noveldataid/${no}/`;
+const byName = (name: string) => name;
+const numberRegex = new RegExp(DEFAULT_EPISODE_PATTERN);
+
+test('編集リンクを相対から絶対 URL にし、番号と組にする', () => {
+  const page = parseEpisodeListPage(
+    '<a href="/usernovelmanage/top/ncode/1/">投稿済<span class="c-up-tab__item-count">2</span></a>' +
+      '<a href="https://ncode.syosetu.com/n1/">A &amp; B</a>' +
+      episodeItem(1) +
+      episodeItem(2),
+  );
+  assert.deepStrictEqual(page, {
+    workTitle: 'A & B',
+    postedCount: 2,
+    episodes: [
+      { number: 1, url: editUrlOf(1) },
+      { number: 2, url: editUrlOf(2) },
+    ],
+  });
+});
+test('編集リンクが無ければ空。別のサイトのリンクは取り込まない', () => {
+  assert.deepStrictEqual(parseEpisodeListPage('第1話 本文のテキスト').episodes, []);
+  const other = episodeItem(1).replace('href="/usernoveldatamanage/updateinput', 'href="https://example.com/usernoveldatamanage/updateinput');
+  assert.deepStrictEqual(parseEpisodeListPage(other).episodes, []);
+  const script = episodeItem(1).replace('href="/usernoveldatamanage/updateinput', 'href="javascript:alert(1)//');
+  assert.deepStrictEqual(parseEpisodeListPage(script).episodes, []);
+});
+test('同じ番号を重ねて貼り付けても 1 件にする', () => {
+  assert.strictEqual(parseEpisodeListPage(episodeItem(1) + episodeItem(1)).episodes.length, 1);
+});
+test('ブラウザで開ける URL の判定', () => {
+  assert.ok(isWebUrl('https://syosetu.com/a'));
+  assert.ok(isWebUrl('http://example.com/'));
+  assert.ok(!isWebUrl('file:///C:/a.txt'));
+  assert.ok(!isWebUrl('syosetu.com/a'));
+});
+test('ep.N とファイル名の番号を照合する（ゼロ埋め・全角も同じ番号）', () => {
+  const eps = [1, 2, 3].map((number) => ({ number, url: editUrlOf(number) }));
+  const m = matchEpisodes(eps, ['第01話.txt', '第０２話.txt', 'プロット.txt'], byName, numberRegex);
+  assert.deepStrictEqual(
+    m.matched.map((x) => [x.episode.number, x.file]),
+    [
+      [1, '第01話.txt'],
+      [2, '第０２話.txt'],
+    ],
+  );
+  assert.deepStrictEqual(m.unmatchedEpisodes, [3]);
+  assert.deepStrictEqual(m.ambiguousEpisodes, []);
+  assert.strictEqual(m.unmatchedFileCount, 1);
+});
+test('同じ番号のファイルは本編（前の部分が最も多いもの）に絞る', () => {
+  const eps = [{ number: 2, url: editUrlOf(2) }];
+  const m = matchEpisodes(eps, ['第01話.txt', '第02話.txt', 'メモ2.txt'], byName, numberRegex);
+  assert.deepStrictEqual(m.matched.map((x) => x.file), ['第02話.txt']);
+});
+test('絞れない同じ番号のファイルには設定しない（章ごとの番号など）', () => {
+  const eps = [{ number: 1, url: editUrlOf(1) }];
+  const m = matchEpisodes(eps, ['第01話.txt', '第01話.txt'], byName, numberRegex);
+  assert.deepStrictEqual(m.matched, []);
+  assert.deepStrictEqual(m.ambiguousEpisodes, [1]);
+});
 
 if (failed > 0) {
   console.error(`\n${failed} 件失敗`);
