@@ -33,12 +33,13 @@ if (!link) {
   errors.push(`CHANGELOG.md の [${version}] のリンクが v${version} を指していません: ${link[1].trim()}`);
 }
 
-// 4. main ブランチで、コミットしていない変更がない（公開する版と main を一致させるため）
+// 4. その版の release ブランチで、コミットしていない変更がない
+//    （アップロードした .vsix と同じ内容を、公開後に main へ取り込むため）
 const git = (args) => execSync(`git ${args}`, { cwd: root, encoding: 'utf8' }).trim();
 try {
   const branch = git('rev-parse --abbrev-ref HEAD');
-  if (branch !== 'main') {
-    errors.push(`main ブランチではありません（現在: ${branch}）`);
+  if (branch !== `release/${version}`) {
+    errors.push(`release/${version} ブランチではありません（現在: ${branch}）`);
   }
   const status = git('status --porcelain --untracked-files=no');
   if (status) {

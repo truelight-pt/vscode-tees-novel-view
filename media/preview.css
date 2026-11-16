@@ -12,7 +12,8 @@ body {
 body {
   margin: 0;
   /* 右側はミニマップと重ならないよう、その幅だけ空ける */
-  padding: 24px calc(16px + var(--tnv-minimap-width)) 50vh 16px;
+  /* 上の余白は、左上の「編集投稿」ボタンが 1 行目に重ならない高さ */
+  padding: 48px calc(16px + var(--tnv-minimap-width)) 50vh 16px;
 }
 
 /* ミニマップ: 表示領域の右端に固定 */
@@ -203,6 +204,46 @@ rt {
   fill: none;
   stroke: currentColor;
   stroke-width: 1.5;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+/* 左上の「編集投稿」ボタン */
+#edit-url {
+  position: fixed;
+  top: 8px;
+  left: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  border: 1px solid var(--vscode-widget-border, transparent);
+  border-radius: 6px;
+  background-color: var(--vscode-button-secondaryBackground, var(--vscode-editorWidget-background));
+  color: var(--vscode-button-secondaryForeground, var(--vscode-editor-foreground));
+  cursor: pointer;
+  z-index: 20;
+  opacity: 0.45;
+  transition: opacity 0.15s;
+}
+
+#edit-url:hover {
+  opacity: 1;
+  background-color: var(--vscode-button-secondaryHoverBackground, var(--vscode-toolbar-hoverBackground));
+}
+
+#edit-url[hidden] {
+  display: none;
+}
+
+#edit-url svg {
+  width: 20px;
+  height: 20px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.2;
   stroke-linecap: round;
   stroke-linejoin: round;
 }
