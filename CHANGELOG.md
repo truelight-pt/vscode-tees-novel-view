@@ -2,7 +2,7 @@
 
 このプロジェクトのバージョンは[セマンティック バージョニング](https://semver.org/lang/ja/)に従います（機能追加でマイナー、不具合の修正でパッチを上げます）。
 
-## [1.2.0] - 未リリース
+## [1.2.0] - 2026-11-17
 
 物語ファイル一覧と小説ビューから、「小説家になろう」の編集ページを直接開けるようになりました。物語ファイル一覧には、ファイルごとの文字数と、複数選択したときの合計文字数も表示します。
 
@@ -45,6 +45,6 @@ Git で管理している原稿の、変更箇所を小説ビューのまま確�
 - ブックマーク: ワークスペースごとに保存、一覧からの移動、`F2` / `Shift+F2` での移動（ファイルをまたぐ移動の ON/OFF）、編集に合わせた行の追従
 - ステータスバー: ルビ・改行・空白を除いた文字数、カーソル行
 
-[1.2.0]: https://github.com/truelight-pt/vscode-tees-novel-view/compare/v1.1.0...HEAD
+[1.2.0]: https://github.com/truelight-pt/vscode-tees-novel-view/compare/v1.1.0...v1.2.0
 [1.1.0]: https://github.com/truelight-pt/vscode-tees-novel-view/compare/v1.0.0...v1.1.0
 [1.0.0]: https://github.com/truelight-pt/vscode-tees-novel-view/releases/tag/v1.0.0
