@@ -41,16 +41,18 @@ code --install-extension tees-novel-view-1.2.0.vsix --force
 リリースするときは次の順に進めます。
 
 1. `CHANGELOG.md` の「未リリース」を公開日（`YYYY-MM-DD`）に、末尾の比較リンクを `.../compare/v<前の版>...v<version>` に書き換えて、release ブランチにコミットする
-2. release ブランチを `main` に取り込む
-3. `main` で `npm run package:release` を実行して .vsix を作る
-4. .vsix を [Visual Studio Marketplace の管理ページ](https://marketplace.visualstudio.com/manage/publishers/Tees-software) にアップロードする
-5. 公開されたら、`main` を push し、注釈付きタグ `v<version>` を付けて push する（必要なら GitHub Releases に .vsix を添付）
+2. release ブランチのまま `npm run package:release` を実行して、.vsix を作り直す（「未リリース」の消えた CHANGELOG が入る）
+3. .vsix を [Visual Studio Marketplace の管理ページ](https://marketplace.visualstudio.com/manage/publishers/Tees-software) にアップロードする
+4. 公開されたら、release ブランチを `main` に取り込み（`git merge --no-ff`）、`main` を push する
+5. 注釈付きタグ `v<version>` を `main` に付けて push する（必要なら GitHub Releases に .vsix を添付）
+
+`main` は公開中の版と一致させるため、取り込みはマーケットプレイスで公開されてから行います。取り込みは `--no-ff` なので、`main` の内容はアップロードした .vsix を作ったコミットと同じになります。
 
 `npm run package:release` は、次のどれかに当てはまると .vsix を作らずに止まります（`scripts/check-release.js`）。
 
 - `CHANGELOG.md` に今の版（`package.json` の `version`）の節が無い、日付が入っていない、「未リリース」が残っている
 - 比較リンクが今の版のタグ（`v<version>`）を指していない（`...HEAD` のまま）
-- `main` ブランチでない、またはコミットしていない変更がある
+- その版の release ブランチ（`release/<version>`）でない、またはコミットしていない変更がある
 
 ## ファイル構成
 

@@ -142,6 +142,9 @@ export class StoryTreeProvider implements vscode.TreeDataProvider<StoryNode>, vs
   private readonly storiesEmitter = new vscode.EventEmitter<void>();
   /** 一覧の内容（物語ファイルとその並び）が変わったとき */
   readonly onDidChangeStories = this.storiesEmitter.event;
+  private readonly selectionEmitter = new vscode.EventEmitter<void>();
+  /** 選択中の項目の合計（selectionTotal）が変わったとき */
+  readonly onDidChangeSelectionTotal = this.selectionEmitter.event;
 
   private readonly treeView: vscode.TreeView<StoryNode>;
   private readonly disposables: vscode.Disposable[] = [];
@@ -158,11 +161,14 @@ export class StoryTreeProvider implements vscode.TreeDataProvider<StoryNode>, vs
   private hasEditUrl: (uri: vscode.Uri) => boolean = () => false;
 
   constructor(private readonly manager: PreviewManager) {
-    this.treeView = vscode.window.createTreeView(STORY_VIEW_ID, { treeDataProvider: this, showCollapseAll: true });
+    // 複数選択すると、ステータスバーに文字数の合計を表示する
+    this.treeView = vscode.window.createTreeView(STORY_VIEW_ID, { treeDataProvider: this, showCollapseAll: true, canSelectMany: true });
     this.disposables.push(
       this.treeView,
       this.changeEmitter,
       this.storiesEmitter,
+      this.selectionEmitter,
+      this.treeView.onDidChangeSelection(() => this.selectionEmitter.fire()),
       vscode.commands.registerCommand('teesNovelView.refreshStories', () => this.scheduleScan(0)),
       vscode.commands.registerCommand('teesNovelView.openStoriesSettings', () =>
         vscode.commands.executeCommand('workbench.action.openSettings', 'teesNovelView.stories'),
@@ -261,6 +267,29 @@ export class StoryTreeProvider implements vscode.TreeDataProvider<StoryNode>, vs
     this.hasEditUrl = hasEditUrl;
     this.disposables.push(onDidChange(() => this.changeEmitter.fire(undefined)));
     this.changeEmitter.fire(undefined);
+  }
+
+  /**
+   * 一覧で選択中のファイル（フォルダーは中のファイルすべて）の数と文字数の合計。
+   * ファイルを 2 つ以上、またはフォルダーを選んでいるときだけ返す。フォルダーとその中のファイルを
+   * 両方選んでも二重には数えない。再走査で項目が作り直されても数えられるよう、場所で照合する
+   */
+  selectionTotal(): { files: number; chars: number } | undefined {
+    const selection = this.treeView.selection;
+    const folders = selection.filter((n) => n.kind === 'folder').map((n) => `${n.uri.toString()}/`);
+    if (folders.length === 0 && selection.length < 2) {
+      return undefined;
+    }
+    const selectedFiles = new Set(selection.filter((n) => n.kind === 'file').map((n) => n.uri.toString()));
+    let files = 0;
+    let chars = 0;
+    for (const [key, node] of this.fileNodes) {
+      if (selectedFiles.has(key) || folders.some((f) => key.startsWith(f))) {
+        files++;
+        chars += (node.kind === 'file' && node.chars) || 0;
+      }
+    }
+    return { files, chars };
   }
 
   /** 一覧に表示されている順（上から下）の物語ファイル */
@@ -386,6 +415,8 @@ export class StoryTreeProvider implements vscode.TreeDataProvider<StoryNode>, vs
     void vscode.commands.executeCommand('setContext', 'teesNovelView.storiesEmpty', roots.length === 0);
     this.changeEmitter.fire(undefined);
     this.storiesEmitter.fire();
+    // 保存などで文字数が変わったら合計も更新する
+    this.selectionEmitter.fire();
     this.revealActive();
   }
 
@@ -473,7 +504,8 @@ export class StoryTreeProvider implements vscode.TreeDataProvider<StoryNode>, vs
 
   /** 表示中の小説ビュー（またはテキストエディター）のファイルを一覧で選択状態にする */
   private revealActive(): void {
-    if (!this.treeView.visible) {
+    // 複数選択中は、選択を 1 つに戻さないよう選択状態を変えない
+    if (!this.treeView.visible || this.treeView.selection.length > 1) {
       return;
     }
     const key = this.manager.editorPreview?.key ?? vscode.window.activeTextEditor?.document.uri.toString();

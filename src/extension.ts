@@ -16,12 +16,13 @@ export function activate(context: vscode.ExtensionContext): void {
   const storyTree = new StoryTreeProvider(manager);
   const gitChanges = new GitChangesWatcher(manager);
   const editUrls = new EditUrlStore(context.workspaceState);
+  const statusBar = new NovelStatusBar(manager);
   context.subscriptions.push(
     editUrls,
     registerEditUrlCommands(editUrls, storyTree),
     bookmarks,
     manager,
-    new NovelStatusBar(manager),
+    statusBar,
     storyTree,
     new BookmarkTreeProvider(bookmarks, manager),
     gitChanges,
@@ -29,6 +30,7 @@ export function activate(context: vscode.ExtensionContext): void {
   storyTree.setGitChanges((uri) => gitChanges.hasChanges(uri), gitChanges.onDidChangeState);
   storyTree.setEditUrls((uri) => editUrls.get(uri) !== undefined, editUrls.onDidChange);
   manager.setEditUrls((uri) => editUrls.get(uri) !== undefined, editUrls.onDidChange);
+  statusBar.setSelectionTotal(() => storyTree.selectionTotal(), storyTree.onDidChangeSelectionTotal);
 
   // 前話・次話を物語ファイル一覧の並び順で探せるようにする
   manager.setStoryOrder(() => storyTree.orderedStories());
